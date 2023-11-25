@@ -23,7 +23,7 @@ public class Trame {
 		crc = new Word(ZERO);
 	}
 
-	public Trame(byte flag,types type,byte num,String data,short crc){
+	public Trame(byte flag,Types type,byte num,String data,short crc){
 		this.flag = new Word(flag);
 		this.type = new Type(type);
 		this.num = new Word(num);

@@ -1,4 +1,4 @@
-public enum types{
+public enum Types{
 	I,
 	C,
 	A,

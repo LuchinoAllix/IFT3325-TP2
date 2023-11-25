@@ -9,7 +9,7 @@ public class Type{
 		type = new Word(00000000);
 	}
 
-	public Type(types type){
+	public Type(Types type){
 		switch (type) {
 			case I: 
 				this.type=new Word('I');

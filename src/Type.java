@@ -9,25 +9,25 @@ public class Type{
 		type = new Word(00000000);
 	}
 
-	public Type(Types type){
+	public Type(char type){
 		switch (type) {
-			case I: 
-				this.type=new Word('I');
+			case 'I': 
+				this.type=new Word(type);
 				break;
-			case C: 
-				this.type=new Word('C');
+			case 'C': 
+				this.type=new Word(type);
 				break;
-			case A: 
-				this.type=new Word('A');
+			case 'A': 
+				this.type=new Word(type);
 				break;
-			case R: 
-				this.type=new Word('R');
+			case 'R': 
+				this.type=new Word(type);
 				break;
-			case F: 
-				this.type=new Word('F');
+			case 'F': 
+				this.type=new Word(type);
 				break;
-			case P: 
-				this.type=new Word('P');
+			case 'P': 
+				this.type=new Word(type);
 				break;
 			default:
 				this.type = new Word(00000000);

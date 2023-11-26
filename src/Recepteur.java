@@ -16,6 +16,8 @@ public class Recepteur{
 	private PrintWriter out;
 	private BufferedReader in;
 
+	public static boolean[] window = new boolean[7];
+
 	public void start(int port) throws IOException {
 		serverSocket = new ServerSocket(port);
 		clientSocket = serverSocket.accept();

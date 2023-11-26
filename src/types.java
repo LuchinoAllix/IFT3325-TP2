@@ -1,4 +1,4 @@
-public enum Types{
+public enum Types{ // No longer used !
 	I,
 	C,
 	A,

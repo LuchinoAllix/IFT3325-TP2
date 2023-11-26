@@ -27,9 +27,10 @@ public class Recepteur{
             if ("hello server".equals(greeting)) {
                 out.println("hello client");
             }
-            else {
-                out.println("unrecognised greeting");
-            }
+            //else {
+            //    out.println("unrecognised greeting");
+            //}
+		out.println("Test");
 	}
 
 	public void stop() throws IOException {
@@ -43,11 +44,9 @@ public class Recepteur{
 	public static void main(String[] args) {
 		Recepteur server = new Recepteur();
 		try {
-			server.start(6669);
+			server.start(6661);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-
-
 }

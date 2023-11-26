@@ -38,7 +38,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param b
 	 */
 	public Word(byte b) {
-		System.out.println("byte formula");
+		//System.out.println("byte formula"); Pourquoi le print ?
 		this.array = new byte[]{b};
 		this.length = 8;
 	}

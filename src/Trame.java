@@ -67,6 +67,19 @@ public class Trame {
 		return false;
 	}
 
+	public static Trame makeComTram(char type,byte num){
+		Trame trame = new Trame(type,num,"");
+		trame.nullifyData();
+		trame.makeCRC();
+		return trame;
+	}
+
+	public static Trame makeInfoTram(char type,byte num,String data){
+		Trame trame = new Trame(type,num,data);
+		trame.makeCRC();
+		return trame;
+	}
+
 	// A voir si d'autres contructeurs seront nécessaire ou pas.
 	// Pour l'instant pas besoin de getteurs & setteurs, l'encapsulation peut être évitée (simplifie le code)
 

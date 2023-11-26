@@ -36,7 +36,7 @@ public class Emetteur{
 		in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 	}
 
-	public String sendMessage(String msg,byte i) throws IOException {
+	public String sendMessage(String msg,int i) throws IOException {
 		out.println(msg);
 		String resp = in.readLine();
 		window[i]=true;
@@ -55,39 +55,34 @@ public class Emetteur{
 		return data;
 	}
 
-	public static Trame makeTrameConnexion(byte num){
-		Trame trame = new Trame('C',num,"");
-		trame.nullifyData();
-		trame.makeCRC();
-		return trame;
-	}
-
-	public static Trame makeNextTrame(char type,byte num){
-		String data = getNextData();
-		Trame trame = new Trame(type,num,data);
-		trame.makeCRC();
-		return trame;
-	}
-
 	public static void main(String[] args) {
+		
 		Emetteur client = new Emetteur();
 		String rep ="";
-		byte i = 0;
+		int i = 0;
 		windowInit();
-		Trame trame = makeTrameConnexion(i);
+		Trame trame = Trame.makeComTram('C',(byte) i);
 		try {
-			client.startConnection("127.0.0.1", 6669);
-			while(!window[i] && windowWeight()<7){
-			rep = client.sendMessage(trame.toString(),i);
-			//todo pour montrer les trames, faire un truc avec rep
-			try {
-				trame = Trame.stringToTrame(rep);
-			} catch (IOError e) {
-				// redemander transmission
+			client.startConnection("127.0.0.1", 6661);
+			while(!window[i] && windowWeight()<7){  
+				rep = client.sendMessage(trame.toString(),(byte) i);
+				//todo pour montrer les trames, faire un truc avec rep
+				try {
+					trame = Trame.stringToTrame(rep);
+					
+				} catch (IOError e) {
+					// redemander transmission
+					trame = new Trame();
+					rep = trame.toString();
+				}
+				
+				if(trame.num.toString().equals("0000000"+i)){
+					window[i]=false;
+					i= (i+1) % 7;
+				}else{
+					
+				}
 			}
-		
-			}
-
 
 		} catch (IOException e) {
 			e.printStackTrace();

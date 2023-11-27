@@ -51,8 +51,7 @@ public class IO {
 				n = n%8;
 				synchronized (self.out_lock) {
 					// avec un rej, on conclu que l'on a recu la trame n-1 et les precedentes
-					self.avancer_out
-			(n);
+					self.avancer_out(n);
 					// on met out_at à n pour la renvoyer
 					self.out_at = n;
 				}
@@ -338,7 +337,7 @@ public class IO {
 					if (!this.can_receive && this.read_len < IO.MAX_BYTES_IN_BUFFER) {
 						this.can_receive = true;
 						this.temporisateur.reset(temp_ack);
-						queue_ctrl(Trame.rr((this.in_at-1)%8));
+						queue_ctrl(Trame.rr(this.in_at));
 						this.logln("Peut maintenant recevoir des trames I");
 					}
 				}
@@ -466,7 +465,7 @@ public class IO {
 		// 1. avancer la fenêtre
 		// tite optimisation: si on n'a pas a déplacer la fenêtre, on fait juste quitter
 		synchronized (this.out_lock) {
-			avancer_out(n+1);
+			avancer_out(n);
 			this.can_send = t.ready();
 		}
 		this.temporisateur.cancel(this.temp_send);

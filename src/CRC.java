@@ -31,7 +31,7 @@ public class CRC {
      * Retourne la longueur d'un code de vérification de ce CRC
      * @return longueur du code cde vérification
      */
-    public int codeLength() { return this.generator.length-1; }
+    public int codeLength() { return Math.max(0, this.generator.length-1); }
 
     /**
      * Calcul le code crc de la chaîne de bits msg.

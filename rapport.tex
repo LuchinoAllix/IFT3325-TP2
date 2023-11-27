@@ -1,0 +1,125 @@
+\documentclass{article}
+
+\usepackage{graphicx} % Required for inserting images
+\usepackage[simplified]{pgf-umlcd}
+\usepackage{titlesec}
+\usepackage{hyperref}
+
+\titleclass{\subsubsubsection}{straight}[\subsection]
+\newcounter{subsubsubsection}[subsubsection]
+\renewcommand\thesubsubsubsection{\thesubsubsection.\arabic{subsubsubsection}}
+\titleformat{\subsubsubsection}
+  {\normalfont\normalsize\bfseries}{\thesubsubsubsection}{1em}{}
+\titlespacing*{\subsubsubsection}
+{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+\makeatletter
+\def\toclevel@subsubsubsection{4}
+\def\l@subsubsubsection{\@dottedtocline{4}{7em}{4em}}
+\makeatother
+\setcounter{secnumdepth}{4}
+
+\title{IFT3325TP2}
+\author{Léo Jetzer \& Luchino Allix}
+\date{November 2023}
+
+\begin{document}
+\maketitle
+
+\newcommand{\lt}{$<$}
+\newcommand{\gt}{$>$}
+\newcommand{\gen}[1]{$<$#1$>$}
+
+\section{Introduction}
+\section{Diagrame de classe}
+
+\section{Description des classes}
+    Voici un résumé des classes importantes. Le javadoc sera également inclus avec le devoir pour plus de détails.
+    
+    \subsection{Bits}
+    La classe \verb#Bits# est un wrapper autour d'un tableau de \verb#byte#. Il permet de pouvoir manipuler plus facilement des bits individuels et des chaînes de bits de longueur arbitraire.
+    
+    \subsection{Trame}
+    Représente les différents types de trame et contient la logique pour encoder/décoder en/à partir d'une chaîne de bits.
+    
+    \subsection{CRC}
+    Contient la logique pour calculer le code crc d'une chaîne de bits à partir d'un générateur donné.
+    
+    \subsection{IO}
+    Contient la logique pour l'envoi/réception et traitement des trames.
+    Lors de la création, il prend un \verb#InputStream# --- sur lequel il va lire les bits entrant --- et un \verb#OutputStream# pour écrire les bits sortant. L'utilisation prévu pour le devoir est de lui passer les streams d'un socket, mais n'importe quel stream peut lui être passé.
+
+    À l'interne, il contient deux threads: un est chargé de constament lire sur le stream d'entrée pour y trouver des trames et de les traiters, l'autre s'occupe d'écrire toutes les trames sortantes sur le stream de sortie. Les opérations sont synchronisées pour éviter que les threads se pile sur les pieds. L'envoi et la réception se fait bit par bit.
+
+    La classe offre une interface permettant de facilement lire et écrire sans se soucier des trames.
+
+    \subsubsection{Envoi de trame}
+    À chaque itération, le thread responsable d'écrire les trames a trois étapes:
+    \begin{enumerate}
+        \item Si on avait précédemment envoyer un RNR, mais que l'on peut maintenant recevoir plus de données, rajouter un RR à la queue de contrôle.
+        \item Envoyer toute les trames de contrôle dans la queue
+        \item Envoyer le plus de trame I possible
+    \end{enumerate}
+    Pour créer la prochaine trame I, la méthode \verb#mkNextTrame()# est appelé. Celle-ci prend jusqu'à 1024 bytes du buffer d'écriture comme message de trame. S'il n'y a plus de byte à envoyer, elle retourne rien et on passe à la prochaine itération.
+
+    L'envoi d'une trame se déroule comme suit:
+    \begin{enumerate}
+        \item La trame est encodé avec \verb#CRC_CCITT# et transformé en chaîne de bits
+        \item on envoi (sans bit stuffing) le flag de début de trame
+        \item on envoi (avec bit stuffing) la chaîne
+        \item on envoi (sans bit stuffing) le flag de fin de trame
+        \item on envoi $11111111$ pour bien délimiter --- Ça permet de ne pas inventer une trame s'il y avait une erreur dans la précédentes et qu'on avait abandonner la lecture
+    \end{enumerate}
+
+    \subsubsection{Réception de trame}
+    La recherche de la prochaine trame reçu se déroule de la manière suivante:
+    \begin{enumerate}
+        \item On lit les bits reçu jusqu'à ce que l'on trouve le flag de début de trame
+        \item On récolte les bits de la trame un par un jusqu'à ce qu'on arrive au flag de fin de trame. On enlève les $0$ de bit stuffing, et si l'on trouve 7 $1$ d'affiler, on lance une erreur et on rejette la trame (ça va simplement nous faire passer à la prochaine itération)
+        \item on décode les bits reçu. la vérification CRC se fait en même temps et s'il y a une erreur on rejette la trame
+        \item la trame est traité selon son type, le mode de connexion et le status
+    \end{enumerate}
+
+    \subsubsection{Traitement d'une trame}
+    Toute les trames sont ignorées si la connexion est fermé. Si le status est à NEW, toute les trames sont ignorées sauf les trames C. En status WAITING, tout est ignoré sauf les trames F et R
+
+    \subsubsubsection{A}
+    Lorsque l'on reçoit une trame A, les choses suivantes se passe:
+    \begin{enumerate}
+        \item Si le status est WAITING, passer à CONNECTED
+        \item avancer la fenêtre d'envoi selon le numéro
+        \item indiquer que l'on peut envoyer d'autre trame ou non selon si c'est un RR ou RNR
+    \end{enumerate}
+    \subsubsubsection{C}
+        On ignore ces trames sauf si on est en status NEW. Dans ce cas, on envoi un RR et un P initial en réponse.
+    \subsubsubsection{F} 
+        lors de la réception d'un F, on ferme les streams et on arrête de lire/envoyer. Le status passe à CLOSED
+    \subsubsubsection{P}
+        À la réception d'un P, on ne fait qu'en envoyer un à notre tour
+    \subsubsubsection{R}
+        Lors de la réception d'un R, on passe la logique à notre mode. Dans le cas de GBN, on ne fait que déplacer la fenêtre d'envoi pour l'aligner avec la trame désirée afin de signaler que c'est la prochaine à envoyer.
+    \subsubsubsection{I}
+        Encore une fois, on passe la logique à notre mode. Dans le cas de GBN, on vérifie que le numéro de la trame est 
+        \begin{enumerate}
+            \item Dans la fenêtre de réception (Si elle ne l'est pas, on l'ignore)
+            \item La trame désirée
+        \end{enumerate}
+        S'il s'agit de la bonne trame, on ajoute les données contenues à notre buffer de lecture, on avance la fenêtre de réception et on envoi un RR (ou un RNR si notre buffer est plein)
+        Sinon, on envoi un REJ
+
+    \subsubsection{Interface}
+    Après la création de l'objet, il faut que l'un utilise la méthode \verb#ouvreConnexion()# pour établir la connexion avec l'autre. 
+    
+    Une fois établi, l'objet donne accès à un \verb#OutputStream# pour envoyer des données. Tout les bytes que ce stream reçoit sont ajouter à un buffer d'écriture et ils seront utilisés pour créer les trames I.
+    De l'autre côté, il suffit de prendre l'\verb#InputStream# que fourni l'objet afin d'y lire les bytes dans son buffer de lecture.
+    
+    À la fin, il est important d'appeler la méthode \verb#fermeConnexion# afin d'arrêter les threads et de libérer les ressources. IO ne ferme pas les streams qui lui sont donné au début. Il faudra donc les fermer vous même.
+
+    \subsubsection{Temporisateur}
+    IO possède également un troisème thread sous la forme d'un \verb#Timer# qui agit comme temporisateur. Trois différents renvoi sont gérer par le temporisateur présentement:
+    \begin{itemize}
+        \item Le renvoi des P si tu es le serveur et que tu n'a pas reçu le P depuis un bon moment. Reset à chaque P reçu
+        \item Le renvoi de RR si tu attend des trames mais que tu n'en a pas reçu depuis un moment. Reset à chaque RR, REJ ou SREJ envoyé. Arrêté lors de l'envoi d'un RNR
+        \item Le renvoi des trames I à partir du début de la fenêtre si aucune réponse n'a été reçu. Reset à l'envoi d'un I, arrêter à la réception d'un RR, RNR, REJ et SREJ
+    \end{itemize}
+
+\end{document}

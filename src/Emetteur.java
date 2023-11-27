@@ -61,18 +61,18 @@ public class Emetteur{
 		String rep ="";
 		int i = 0;
 		windowInit();
-		Trame trame = Trame.makeComTram('C',(byte) i);
+		TrameO trame = TrameO.makeComTram('C',(byte) i);
 		try {
 			client.startConnection("127.0.0.1", 6661);
 			while(!window[i] && windowWeight()<7){  
 				rep = client.sendMessage(trame.toString(),(byte) i);
 				//todo pour montrer les trames, faire un truc avec rep
 				try {
-					trame = Trame.stringToTrame(rep);
+					trame = TrameO.stringToTrame(rep);
 					
 				} catch (IOError e) {
 					// redemander transmission
-					trame = new Trame();
+					trame = new TrameO();
 					rep = trame.toString();
 				}
 				

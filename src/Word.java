@@ -38,7 +38,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param b
 	 */
 	public Word(byte b) {
-		//System.out.println("byte formula"); Pourquoi le print ?
+		System.out.println("byte formula");
 		this.array = new byte[]{b};
 		this.length = 8;
 	}
@@ -118,9 +118,19 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param arr
 	 * @param len
 	 */
-	private Word(byte[] arr, int len) {
+	public Word(byte[] arr, int len) {
 		this.array = arr;
 		this.length = len;
+	}
+
+	public Word(byte[] orig){
+		this.array = orig;
+		this.length = orig.length*8;
+	}
+	public Word(Word orig) {
+		this.array = new byte[orig.array.length];
+		System.arraycopy(orig.array, 0, this.array, 0, this.array.length);
+		this.length = orig.length;
 	}
 
 	/**
@@ -1711,9 +1721,13 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 */
 	@Override
 	public Word clone() {
+		return new Word(this);
+	}
+
+	public byte[] toByteArray(){
 		byte[] arr = new byte[this.array.length];
-		System.arraycopy(this.array, 0, arr, 0, length);
-		return new Word(arr, this.length);
+		System.arraycopy(this.array, 0, arr, 0, this.array.length);
+		return arr;
 	}
 
 	/**

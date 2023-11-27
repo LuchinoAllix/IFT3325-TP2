@@ -612,8 +612,6 @@ public class IO {
 				this.write_len -= len;
 				Trame t = Trame.i(this.out_at, msg);
 				return Optional.of(t);
-			} else {
-				try { this.write_lock.wait(); } catch (InterruptedException e) {}
 			}
 		}
 		return Optional.empty();

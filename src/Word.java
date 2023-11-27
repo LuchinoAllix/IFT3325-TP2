@@ -5,7 +5,9 @@ import java.util.Optional;
 
 /**
  * Une séquence de bit. Utilise un indexage commençant à 0 et un alignement à gauche
- * la plupart des opérations ont une version statique et une version non statique. La version non statique est équivalente à la version statique utilisant this comme premier arguments, mais le résultat est assigné à this
+ * la plupart des opérations ont une version statique et une version non statique. La version non statique est équivalente à la version statique utilisant this comme premier arguments, mais le résultat est assigné à this.
+ * 
+ * Est essentiellement un wrapper autour d'un tableau de bytes, mais offre des opérations pour avoir (virtuellement) des chaines de longueur arbitraire et des accès au bits individuels.
  */
 public class Word implements Comparable<Word>, Iterable<Boolean> {
 	// je suis trisse parce que java ne permet pas:
@@ -15,15 +17,28 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 
 	// si le length n'est pas un multiple de 8, les bits du dernier byte ne sont pas tous utilisés.
 	// les bits à gauche sont ceux utilisé, ceux à droite sont non définis et peuvent être n'importe quoi
+	/**
+	 * tableau interne de byte
+	 */
 	public byte[] array;
 	/**
 	 * Longueur (en bit) de la chaine
 	 */
 	public int length;
 
+	// Pourquoi est-ce que java hais les bytes ?
+	/**
+	 * 0. Parce que c'est plus facile que tapper (byte)0 à chaque fois.
+	 */
 	private static final byte ZERO = (byte)0;
+	/**
+	 * 1. Parce que c'est plus facile que tapper (byte)1 à chaque fois.
+	 */
 	@SuppressWarnings("unused")
 	private static final byte ONE = (byte)1;
+	/**
+	 * 111111111
+	 */
 	private static final byte FULL = (byte)255;
 
 	/** 
@@ -114,7 +129,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 			this.array[i] = arr.get(i);
 	}
 	/**
-	 * usage privé. Assume que len <= 8*arr.length
+	 * usage privé principalement. Assume que len <= 8*arr.length
 	 * @param arr
 	 * @param len
 	 */
@@ -123,10 +138,18 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		this.length = len;
 	}
 
+	/**
+	 * Créer un mot à partir d'un tableau de bytes. Assume que tout les bits sont pertinents donc <code>this.length = 8*orig.length</code>
+	 * @param orig
+	 */
 	public Word(byte[] orig){
 		this.array = orig;
 		this.length = orig.length*8;
 	}
+	/**
+	 * Clone un mot
+	 * @param orig
+	 */
 	public Word(Word orig) {
 		this.array = new byte[orig.array.length];
 		System.arraycopy(orig.array, 0, this.array, 0, this.array.length);
@@ -134,8 +157,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	}
 
 	/**
-	 * Un mot constitué de len 0
-	 * @param len
+	 * Un mot constitué de len x 0
+	 * @param len longueur du mot
 	 * @return
 	 */
 	public static Word zero(int len) {
@@ -145,8 +168,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		return new Word(arr, len);
 	}
 	/**
-	 * Un mot constitué de len 1
-	 * @param len
+	 * Un mot constitué de len x 1
+	 * @param len longueur du mot
 	 * @return
 	 */
 	public static Word one(int len) {
@@ -159,7 +182,15 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 
 	// records pour contenir plusieurs valeur lors des retours
 	// PLZZZZZ java fait juste supporter les tuples S'IL TE PLAÎT!!!!!!!
+	/**
+	 * Tuple utliser comme type de retour pour certaines opérations qui demande de modifier un byte du mot
+	 * Contient le mot modifié ainsi que la valueur du byte précédent
+	 */
 	public static record SetByteResult(Word result, byte old) {}
+	/**
+	 * Tuple utliser comme type de retour pour certaines opérations qui demande de modifier un bit du mot
+	 * Contient le mot modifié ainsi que la valueur du bit précédent
+	 */
 	public static record SetBitResult(Word result, boolean old) {}
 	/**
 	 * Retourne le ième bit de la séquence (partant de la gauche)
@@ -493,15 +524,39 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 */
 	private static record ConcatRequest(byte[] arr, int len) {}
 
+	/**
+	 * Retourne un nouveau mot composé de <code>src</code> suivit de n 0
+	 * @param src mot original
+	 * @param n nombre de 0 à rajouter
+	 * @return nouveau mot étendu
+	 */
 	public static Word zeroExtend(Word src, int n) {
 		return concat(src, zero(n));
 	}
+	/**
+	 * Retourne un nouveau mot composé de <code>src</code> précédé de n 0
+	 * @param src mot original
+	 * @param n nombre de 0 à rajouter
+	 * @return nouveau mot étendu
+	 */
 	public static Word preZeroExtend(Word src, int n) {
 		return concat(zero(n), src);
 	}
+	/**
+	 * Retourne un nouveau mot composé de <code>src</code> suivit de n 1
+	 * @param src mot original
+	 * @param n nombre de 1 à rajouter
+	 * @return nouveau mot étendu
+	 */
 	public static Word oneExtend(Word src, int n) {
 		return concat(src, one(n));
 	}
+	/**
+	 * Retourne un nouveau mot composé de <code>src</code> précédé de n 1
+	 * @param src mot original
+	 * @param n nombre de 0 à rajouter
+	 * @return nouveau mot étendu
+	 */
 	public static Word preOneExtend(Word src, int n) {
 		return concat(one(n), src);
 	}
@@ -588,28 +643,63 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	/**
 	 * record représentant une requête de bits. Tuple de la valeur des bits et du nombre de bits pertinent (0-index, left-align)
 	 */
-	public static record Request<T>(T value, int len) {
-
-	}
+	public static record Request<T>(T value, int len) {}
+	/**
+	 * Tuple représentant le résultat d'une requête de bits.
+	 * Contient la valeur des bits demander, l'index du premier bits pertinent (0 à gauche), le nombre de bits pertinent et un masque ou seul les bits aux positions pertinentes sont à 1
+	 */
 	public static record BitsRequest(byte value, byte offset, byte len, byte mask) {}
+	/**
+	 * Similaire à BitsRequest, mais contient à la fois l'ancienne valeur des bits demandé et les bits après l'application d'une fonction
+	 * @see BitsRequest
+	 */
 	public static record ApplyBitsRequest(byte old_value, byte new_value, byte offset, byte len, byte mask) {
+		/**
+		 * Forme un BitsRequest en utilisant l'ancienne valuer
+		 * @return BitsRequest(old_value, offset, len, mask)
+		 */
 		public BitsRequest request_old() { return new BitsRequest(old_value, offset, len, mask); }
+		/**
+		 * Forme un BitsRequest en utilisant la nouvelle valeur
+		 * @return BitsRequest(new_value, offset, len, mask)
+		 */
 		public BitsRequest request_new() { return new BitsRequest(new_value, offset, len, mask); }
 	}
 	/**
-	 * Similaire à ByteRequest, mais est fait pour les fonctions 'apply' et contient également la nouvelle valeur calculée
+	 * Similaire à Request, mais est fait pour les fonctions 'apply' et contient également la nouvelle valeur calculée
+	 * @see Request
 	 */
 	public static record ApplyRequest<T>(T value_old, T value_new, byte len) {
+		/**
+		 * Forme un Request en utilisant l'ancienne valeur
+		 * @return Request(new_value, len)
+		 */
 		public Request<T> request_old() { return new Request<T>(value_old, len); }
+		/**
+		 * Forme un Request en utilisant la nouvelle valeur
+		 * @return Request(new_value, len)
+		 */
 		public Request<T> request_new() { return new Request<T>(value_new, len); }
 	}
 	/**
 	 * Indique comment calculer la taille du mot de retour
 	 */
 	public enum ApplyMode {
+		/**
+		 * Ne garde que les bits en position dans le premier argument
+		 */
 		FIRST, // utilise la taille et alignement du premier argument
+		/**
+		 * Ne garde que les bits en position dans le second argument
+		 */
 		SECOND, // utilise la taille et alignement du deuxième argument
+		/**
+		 * Garde tous les bits. Si il y a un trou dans l'alignement, rajoute des bits
+		 */
 		UNION, // Utilise également les bits des arguments qui ne se superpose pas, assumant que les bits manquant sont égal à fill
+		/**
+		 * Ne garde que les bits en position dans les deux arguments
+		 */
 		INTERSECTION // Utilise uniquement les bits superposés
 	}
 	/**
@@ -652,28 +742,62 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	}
 	/**
 	 * retourne le byte du mot commençant à at, utilisant la valeur de fill pour les bits manquants
-	 * @param arr
-	 * @param bit_len
-	 * @param at
-	 * @param fill
+	 * @param arr tableau de byte
+	 * @param bit_len nombre de bit pertinent dans le tableau
+	 * @param at position du premier bit désiré
+	 * @param fill valeur utiliser pour les bits manquant
 	 * @return
 	 */
 	private static Request<Byte> byte_at(byte[] arr, int bit_len, int at, boolean fill) {
 		BitsRequest bits = n_bits_at(arr, bit_len, at, 8, fill);
 		return new Request<Byte>(bits.value, bits.len);
 	}
+	/**
+	 * Assigne val au byte commençant à at. Retourne l'ancienne valeur
+	 * @param arr tableau de byte
+	 * @param bit_len nombre de bit pertinent dans le tableau
+	 * @param at position du premier bit désiré
+	 * @param val valeur à assigner
+	 * @return l'ancienne valeur
+	 */
 	private static Request<Byte> set_byte_at(byte[] arr, int bit_len, int at, byte val) {
 		BitsRequest bits = set_n_bits_at(arr, bit_len, at, 8, val, false);
 		return new Request<Byte>(bits.value, bits.len);
 	}
+	/**
+	 * Applique <code>fun</code> au byte commençant à <code>at</code> en utilisant <code>val</code> comme deuxième argument
+	 * @param arr tableau de byte
+	 * @param bit_len nombre de bit pertinent dans le tableau
+	 * @param at position du premier bit désiré
+	 * @param val deuxième argument pour <code>fun</code>
+	 * @param fun fonction sur deux byte
+	 * @return (ancienne valeur, nouvelle valeur, nombre de bit pertinent)
+	 */
 	private static ApplyRequest<Byte> apply_byte_at(byte[] arr, int bit_len, int at, byte val, ByteFunc fun) {
 		ApplyBitsRequest bits = apply_n_bits_at(arr, bit_len, at, 8, val, fun, false);
 		return new ApplyRequest<Byte>(bits.old_value, bits.new_value, bits.len);
 	}
+	/**
+	 * Similaire à <code>apply_byte_at(byte[], int, int, byte, ByteFunc)</code> mais utilise un fonction unaire
+	 * @param arr tableau de byte
+	 * @param bit_len nombre de bit pertinent dans le tableau
+	 * @param at position du premier bit désiré
+	 * @param fun fonction sur un byte
+	 * @return (ancienne valeur, nouvelle valeur, nombre de bit pertinent)
+	 */
 	private static ApplyRequest<Byte> apply_byte_at(byte[] arr, int bit_len, int at, UnaryByteFunc fun) {
 		ApplyBitsRequest bits = apply_n_bits_at(arr, bit_len, at, 8, fun, false);
 		return new ApplyRequest<Byte>(bits.old_value, bits.new_value, bits.len);
 	}
+	/**
+	 * Retourne jusqu'à n bits, commençant à la position at. Permet des index qui ne sont pas dans le mot; dans ces cas, la valeur de fill sera utiliser pour les bits manquant.
+	 * @param arr tableau de byte
+	 * @param bit_len nombre de bit pertinent dans le tableau
+	 * @param at position du premier bit désiré
+	 * @param n nombre de bit désiré
+	 * @param fill valeur à utiliser pour les bits manquants
+	 * @return BitsRequest contenant les bits demandés ainsi que que les informations nécessaires pour identifier les bits pertinents
+	 */
 	private static BitsRequest n_bits_at(byte[] arr, int bit_len, int at, int n, boolean fill) {
 		n = Math.max(Math.min(n, 8), 0);
 		if (at+n <= 0 || at >= bit_len) return new BitsRequest(fill? FULL : ZERO, ZERO, ZERO, ZERO);
@@ -711,6 +835,16 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 			}
 		}
 	}
+	/**
+	 * Assigne jusqu'à n bits, commençant à la position at. Permet des index qui ne sont pas dans le mot; dans ces cas, la valeur de fill sera utiliser pour les bits manquant.
+	 * @param arr tableau de byte
+	 * @param bit_len nombre de bit pertinent dans le tableau
+	 * @param at position du premier bit désiré
+	 * @param n nombre de bit désiré. 0 <= n <= 8
+	 * @param val nouvelle valeur des bits. place le bit le plus à gauche à la position at
+	 * @param fill valeur à utiliser pour les bits manquants
+	 * @return BitsRequest contenant l'ancienne valeur des bits demandés ainsi que que les informations nécessaires pour identifier les bits pertinents
+	 */
 	private static BitsRequest set_n_bits_at(byte[] arr, int bit_len, int at, int n, byte val, boolean fill) {
 		n = Math.max(Math.min(n, 8), 0);
 		if (at+n <= 0 || at >= bit_len) return new BitsRequest(fill? FULL : ZERO, ZERO, ZERO, ZERO);
@@ -754,6 +888,17 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 			}
 		}
 	}
+	/**
+	 * Applique <code>fun</code> sur les n bits commençant à <code>at</code> et assigne le résultat à la position. Permet des index qui ne sont pas dans le mot; dans ces cas, la valeur de fill sera utiliser pour les bits manquant.
+	 * @param arr tableau de byte
+	 * @param bit_len nombre de bit pertinent dans le tableau
+	 * @param at position du premier bit désiré
+	 * @param n nombre de bit désiré. 0 <= n <= 8
+	 * @param val deuxième argument pour fun
+	 * @param fun fonction sur deux byte
+	 * @param fill valeur à utiliser pour les bits manquants
+	 * @return ApplyBitsRequest contenant l'ancienne et la nouvelle valeur des bits ainsi que toutes les informations nécessaires pour identifier les bits pertinents
+	 */
 	private static ApplyBitsRequest apply_n_bits_at(byte[] arr, int bit_len, int at, int n, byte val, ByteFunc fun, boolean fill) {
 		n = Math.max(Math.min(n, 8), 0);
 		if (at+n <= 0 || at >= bit_len) return new ApplyBitsRequest(fill? FULL : ZERO, fun.apply(ZERO, ZERO), ZERO, ZERO, ZERO);
@@ -802,6 +947,16 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 			}
 		}
 	}
+	/**
+	 * Applique <code>fun</code> sur les n bits commençant à <code>at</code> et assigne le résultat à la position. Permet des index qui ne sont pas dans le mot; dans ces cas, la valeur de fill sera utiliser pour les bits manquant.
+	 * @param arr tableau de byte
+	 * @param bit_len nombre de bit pertinent dans le tableau
+	 * @param at position du premier bit désiré
+	 * @param n nombre de bit désiré. 0 <= n <= 8
+	 * @param fun fonction sur un byte
+	 * @param fill valeur à utiliser pour les bits manquants
+	 * @return ApplyBitsRequest contenant l'ancienne et la nouvelle valeur des bits ainsi que toutes les informations nécessaires pour identifier les bits pertinents
+	 */
 	private static ApplyBitsRequest apply_n_bits_at(byte[] arr, int bit_len, int at, int n, UnaryByteFunc fun, boolean fill) {
 		n = Math.max(Math.min(n, 8), 0);
 		if (at+n <= 0 || at >= bit_len) return new ApplyBitsRequest(fill? FULL : ZERO, fun.apply(ZERO), ZERO, ZERO, ZERO);
@@ -854,7 +1009,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	/**
 	 * Calcul l'offset necessaire pour w2 pour que les 2 mots soit aligné à droite
 	 * @param w2
-	 * @return
+	 * @return 
 	 */
 	public int alignRight(Word w2) {
 		return this.length - w2.length;
@@ -1289,7 +1444,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		return this;
 	}
 	/**
-	 * Retourne un nouveau mot correspondant à src mais avec tout les bits shifter de amount places vers la droite (gauche si negatif)
+	 * Retourne un nouveau mot correspondant à src mais avec tout les bits shifter de amount places vers la droite (gauche si negatif). La longueur du mot ne change pas
 	 * @param src
 	 * @param amount
 	 * @return
@@ -1299,7 +1454,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		return new Word(arr, src.length);
 	}
 	/**
-	 * Retourne un nouveau mot correspondant à src mais avec tout les bits shifter de amount places vers la droite (gauche si negatif), utilisant la valeur de val pour les bit entrant
+	 * Retourne un nouveau mot correspondant à src mais avec tout les bits shifter de amount places vers la droite (gauche si negatif), utilisant la valeur de val pour les bit entrant. La longueur du mot ne change pas
 	 * @param src
 	 * @param amount
 	 * @return
@@ -1437,6 +1592,11 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		}
 		return String.valueOf(cs);
 	}
+	/**
+	 * Retourne la représentation binaire du byte donné. Montre toujours les 8 bits.
+	 * @param b
+	 * @return
+	 */
 	public static String stringifyByte(byte b) { return stringifyByte(b, (byte)8); }
 	@Override
 	public String toString() {
@@ -1724,6 +1884,10 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		return new Word(this);
 	}
 
+	/**
+	 * Retourne un tableau de byte dont les bits sont les mêmes que ceux du mot
+	 * @return
+	 */
 	public byte[] toByteArray(){
 		byte[] arr = new byte[this.array.length];
 		System.arraycopy(this.array, 0, arr, 0, this.array.length);
@@ -1813,31 +1977,28 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param num
 	 * @return
 	 */
-	@SuppressWarnings("unused")
 	private static int fast_log2(int num) {
 		if( num == 0 ) return 0;
     	return 31 - Integer.numberOfLeadingZeros(num);
 	}
-	@SuppressWarnings("unused")
+	/*
 	private static int fast_log2(byte num) {
 		if( num == 0 ) return 0;
     	return 31 - Integer.numberOfLeadingZeros(num&255);
 	}
-	@SuppressWarnings("unused")
 	private static long fast_log2_ceil(long num) {
 		if( num == 0 ) return 0;
     	return 64 - Long.numberOfLeadingZeros(num - 1);
 	}
-	@SuppressWarnings("unused")
 	private static int fast_log2_ceil(int num) {
 		if( num == 0 ) return 0;
     	return 32 - Integer.numberOfLeadingZeros(num - 1);
 	}
-	@SuppressWarnings("unused")
 	private static int fast_log2_ceil(byte num) {
 		if( num == 0 ) return 0;
     	return 32 - Integer.numberOfLeadingZeros((num&255) - 1);
 	}
+	*/
 
 	/**
 	 * masque n'ayant que les n premier bit (fait pour être utiliser avec des byte donc n'utilise que les 8 derniers bits)

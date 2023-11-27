@@ -194,8 +194,8 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 		int min_nb_of_bits = 16 + gen_len;
 		if (bits.length < min_nb_of_bits) throw new TrameException("Trame trop petite"); 
 		// vérification du crc
-		Word check = gen.crc(bits);
-		if (check.countOne() != 0) throw new TrameException("crc incorecte");
+		boolean check = gen.isValid(bits);
+		if (check) throw new TrameException("crc incorecte");
 
 		int crc_start = bits.length - gen_len;
 		try {

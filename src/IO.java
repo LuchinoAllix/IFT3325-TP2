@@ -3,8 +3,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Classe gérant l'échange de trame d'un point à l'autre
@@ -33,7 +36,7 @@ public class IO {
 		*/
 		CLOSED}
 	
-	//public static enum Role {SERVER, CLIENT}
+	public static enum Role {SERVER, CLIENT}
 	/**
 	 * Mode pour la reception des trame I
 	 * S'occupe de la logique d'ack et rej
@@ -83,14 +86,20 @@ public class IO {
 							self.in_at = (n+1)%8;
 							// envoyer une confirmation selon la place qu'il nous reste
 							if (self.read_len >= IO.MAX_BYTES_IN_BUFFER) {
+								self.temporisateur.cancel(self.temp_ack);
+								self.can_receive = false;
 								return Trame.rnr(n);
 							} else {
+								self.temporisateur.reset(self.temp_ack);
+								self.can_receive = true;
 								return Trame.rr(n);
 							}
 						}
 					} else {
 						// on n'a pas a déplacer la fenêtre
 						// on envoi un rejet
+						self.temporisateur.reset(self.temp_ack);
+						synchronized (self.in_lock) { self.can_receive = true; }
 						return Trame.rej(self.in_at);
 					}
 				} else {
@@ -158,16 +167,22 @@ public class IO {
 						n = n-1; // précédent
 						n = n<0? n+8 : n;
 						if (self.read_len >= IO.MAX_BYTES_IN_BUFFER) {
+							self.temporisateur.cancel(self.temp_ack);
+							self.can_receive = false;
 							return Trame.rnr(n);
 						} else {
+							self.temporisateur.reset(self.temp_ack);
+							self.can_receive = true;
 							return Trame.rr(n);
 						}
 					} else {
 						// on veut ajouter cette trame au buffer
 						synchronized (self.in_lock) {
 							self.in_buffer[n] = trame;
+							self.can_receive = true;
 						}
 						// on avance rien, mais on veut envoyer un srej
+						self.temporisateur.reset(self.temp_ack);
 						return Trame.srej(n);
 					}
 				} else {
@@ -218,6 +233,7 @@ public class IO {
 	private static final int MAX_I_TRAME_SIZE = 1024;
 	private static final Word BIT_INV = new Word("11111111");
 	private static final Word FLAG = new Word("01111110");
+	private static final long DELAIS_TEMPORISATEUR = 3000;
 	
 	private Status status = Status.NEW;
 	private Mode mode = null;
@@ -241,6 +257,7 @@ public class IO {
 	private Trame.I[] in_buffer = new Trame.I[8]; // buffer de trames entrantes; pour selective reject
 	private Object in_lock = new Lock();
 	private Thread in_thread;
+	private boolean can_receive = true;
 
 	private OutputStream out_stream; // pour écrire les trames sortantes
 	private Object out_lock = new Lock();
@@ -251,6 +268,32 @@ public class IO {
 	private Thread out_thread;
 	private final float chance_bit_errone; // probabilité (0.0-1.0) qu'un bit envoyé soit à la place déterminé aléatoirement
 	private final boolean skip_erreur; // flag pour rapidement éviter les erreurs
+
+	private Role role = null;
+	private Temporisateur temporisateur = new Temporisateur();
+	private Marker temp_p = new Marker(this) {  // temporisateur pour l'envoi d'une trame P
+		@Override
+		public void run() {
+			self.queue_ctrl(Trame.p());
+			self.temporisateur.reset(this);
+		}
+	};
+	private Marker temp_send = new Marker(this) { // temporisateur pour l'envoi des trames I si on ne reçoit pas de ack
+		@Override
+		public void run() {
+			synchronized (self.out_lock) {
+				self.out_at = self.out_start;
+			}
+		}
+	};
+	private Marker temp_ack = new Marker(this) { // temporisateur pour l'envoi des acks
+		@Override
+		public void run() {
+			Trame t = Trame.rr((self.in_at-1)%8);
+			self.queue_ctrl(t);
+			self.temporisateur.reset(this);
+		}
+	};
 
 	public IO(InputStream input, OutputStream output, float chance_bit_errone) {
 		if (chance_bit_errone < 0) chance_bit_errone = 0;
@@ -274,6 +317,14 @@ public class IO {
 		try {
 			do {
 				if (this.kill) break;
+				// Étape 0: si on peut recommencer à recevoir des trames, le signaler
+				synchronized (this.in_lock) {
+					if (!this.can_receive && this.read_len < IO.MAX_BYTES_IN_BUFFER) {
+						this.can_receive = true;
+						this.temporisateur.reset(temp_ack);
+						queue_ctrl(Trame.rr((this.in_at-1)%8));
+					}
+				}
 				// Étape 1: envoyer toutes les trames de controle
 				synchronized (this.out_ctrl_queue) {
 					while (!this.out_ctrl_queue.isEmpty()) {
@@ -296,6 +347,7 @@ public class IO {
 							this.out_at += 1;
 						}
 					}
+					this.temporisateur.reset(temp_send);
 				}
 			} while (this.status != Status.CLOSED);
 		} catch (IOException e) {
@@ -378,8 +430,13 @@ public class IO {
 	 * @throws Trame.TrameException
 	 */
 	private boolean receive(Trame.A t) throws Trame.TrameException {
-		if (this.status == Status.NEW) { return false; } // ignore
-		if (this.status == Status.WAITING) { this.status = Status.CONNECTED; } // confirmation de la connection 
+		if (this.status == Status.NEW || this.status == Status.CLOSED) { return false; } // ignore
+		if (this.status == Status.WAITING) { // confirmation de la connection 
+			this.status = Status.CONNECTED; 
+			this.role = Role.CLIENT; 
+			synchronized (this) { this.notifyAll(); }
+		}
+		
 		int n = t.getNum().get();
 		// on assume qu'on ne recoit pas d'ack pour une trame pas envoyer
 		// 1. avancer la fenêtre
@@ -388,6 +445,7 @@ public class IO {
 			avancer_out(n+1);
 			this.can_send = t.ready();
 		}
+		this.temporisateur.cancel(this.temp_send);
 		// indiquer si l'on peut envoyer plus de trame
 		return true;
 	}
@@ -402,8 +460,10 @@ public class IO {
 		if (this.status == Status.NEW) {
 			// on active la connexion et on envoi un P et un RR en confirmation
 			this.status = Status.CONNECTED;
+			this.role = Role.SERVER;
 			queue_ctrl(Trame.rr(this.in_at));
 			queue_ctrl(Trame.p());
+			this.temporisateur.reset(temp_p);
 			return true;
 		} else {
 			// ignore
@@ -418,7 +478,7 @@ public class IO {
 	 */
 	private boolean receive(Trame.F t) throws Trame.TrameException {
 		if (this.status == Status.CONNECTED || this.status == Status.WAITING){
-			this.status = Status.CLOSED;
+			close_all();
 			return true;
 		}
 		return false; // sinon ignore
@@ -430,7 +490,7 @@ public class IO {
 	 * @throws Trame.TrameException si la trame contient une erreur
 	 */
 	private boolean receive(Trame.I t) throws Trame.TrameException {
-		if ((this.status != Status.NEW && this.status != Status.WAITING) || this.mode == null) { // si on n'a pas encore de connexion, on ignore les trames I
+		if (this.can_receive && this.status == Status.CONNECTED && this.mode != null) { // si on n'a pas encore de connexion, on ignore les trames I
 			// on délègue la logique au mode
 			Trame ret = this.mode.update_in(this, t);
 			// on envoie la trame par la queue de ctrl
@@ -449,6 +509,7 @@ public class IO {
 		// on fait juste le renvoyer si on est connecté
 		if (this.status == Status.CONNECTED){
 			queue_ctrl(Trame.p());
+			if (this.role == Role.SERVER) this.temporisateur.reset(this.temp_p);
 			return true;
 		}
 		// sinon ignore
@@ -461,15 +522,12 @@ public class IO {
 	 * @throws Trame.TrameException si le mode de rejet demander est invalide
 	 */
 	private boolean receive(Trame.R t) throws Trame.TrameException {
-		if (this.status == Status.WAITING) {
-			this.status = Status.CONNECTED;
-			synchronized (this) { this.notifyAll(); }
-		}
 		if (this.status == Status.CONNECTED) {
 			int n = t.getNum().get();
 			Mode m = t.selectif()? Mode.SELECT : Mode.GBN;
 			if (this.mode == null || !this.mode.supporte(m)) throw new Trame.TrameException("Mode de rejet invalide");
 			m.update_out(n, this);
+			this.temporisateur.cancel(this.temp_send);
 			return true;
 		}
 		return false;
@@ -851,4 +909,31 @@ public class IO {
 	}
 
 	private static class Lock {}
+	private static class Temporisateur {
+		HashMap<Marker, TimerTask> markers = new HashMap<>();
+		private Timer timer = new Timer(true);
+		void reset(Marker marker) {
+			TimerTask old = this.markers.get(marker);
+			if (old != null) old.cancel();
+			TimerTask new_task = new MarkerTask(marker);
+			this.timer.schedule(new_task, DELAIS_TEMPORISATEUR);
+			this.markers.put(marker, new_task);
+		}
+		void cancel(Marker marker) {
+			TimerTask old = this.markers.remove(marker);
+			if (old != null) old.cancel();
+		}
+	}
+	private static class Marker {
+		IO self;
+		Marker(IO self) { this.self = self; }
+		public void run() {}
+	}
+	private static class MarkerTask extends TimerTask {
+		Marker src;
+		MarkerTask(Marker src) {this.src = src;}
+		@Override
+		public void run() { this.src.run(); }
+		
+	}
 }

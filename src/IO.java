@@ -46,7 +46,7 @@ public class IO {
 		 * Go-Back-N
 		 */
 		GBN(7) {
-			Trame mk_rejet(int n) { return Trame.rej(n); }
+			//Trame mk_rejet(int n) { return Trame.rej(n); }
 			void update_out(int n, IO self) {
 				n = n%8;
 				synchronized (self.out_lock) {
@@ -71,6 +71,7 @@ public class IO {
 					if (n == self.in_at) {
 						// dans ce mode, on n'utilise pas vraiment le buffer
 						// ajouter le message au buffer
+						self.logln("\tajout du msg au buffer");
 						synchronized (self.read_lock) {
 							byte[] msg = trame.getMsg().get().toByteArray();
 							int new_len = self.read_len + msg.length;
@@ -88,10 +89,12 @@ public class IO {
 							if (self.read_len >= IO.MAX_BYTES_IN_BUFFER) {
 								self.temporisateur.cancel(self.temp_ack);
 								self.can_receive = false;
+								self.logln("\tenvoi rnr("+n+")");
 								return Trame.rnr(n);
 							} else {
 								self.temporisateur.reset(self.temp_ack);
 								self.can_receive = true;
+								self.logln("\tenvoi rr("+n+")");
 								return Trame.rr(n);
 							}
 						}
@@ -100,10 +103,13 @@ public class IO {
 						// on envoi un rejet
 						self.temporisateur.reset(self.temp_ack);
 						synchronized (self.in_lock) { self.can_receive = true; }
+						self.logln("\tpas la trame attendu");
+						self.logln("\tenvoi rej("+n+")");
 						return Trame.rej(self.in_at);
 					}
 				} else {
 					// sinon on ignore
+					self.logln("\tignore (trame déjà reçu)");
 					return null;
 				}
 			}
@@ -113,8 +119,8 @@ public class IO {
 		 * Selective Reject
 		 */
 		SELECT(3) {
-			@Override
-			Trame mk_rejet(int n) { return Trame.srej(n); }
+			//@Override
+			//Trame mk_rejet(int n) { return Trame.srej(n); }
 			@Override
 			void update_out(int n, IO self) {
 				n = n%8;
@@ -146,6 +152,7 @@ public class IO {
 							self.in_buffer[n] = trame;
 							while ((trame = self.in_buffer[n]) != null) {
 								// on va créer beaucoup d'array mais bon
+								self.logln("\tajout du message au buffer");
 								synchronized (self.read_lock) {
 									byte[] msg = trame.getMsg().get().toByteArray();
 									int new_len = self.read_len + msg.length;
@@ -169,24 +176,29 @@ public class IO {
 						if (self.read_len >= IO.MAX_BYTES_IN_BUFFER) {
 							self.temporisateur.cancel(self.temp_ack);
 							self.can_receive = false;
+							self.logln("\tenvoi rnr("+n+")");
 							return Trame.rnr(n);
 						} else {
 							self.temporisateur.reset(self.temp_ack);
 							self.can_receive = true;
+							self.logln("\tenvoi rr("+n+")");
 							return Trame.rr(n);
 						}
 					} else {
 						// on veut ajouter cette trame au buffer
+						self.logln("\tpas la trame attendu; ajout au buffer pour plus tard");
 						synchronized (self.in_lock) {
 							self.in_buffer[n] = trame;
 							self.can_receive = true;
 						}
 						// on avance rien, mais on veut envoyer un srej
 						self.temporisateur.reset(self.temp_ack);
+						self.logln("\tenvoi srej("+n+")");
 						return Trame.srej(n);
 					}
 				} else {
 					// sinon on ignore
+					self.logln("\tignore (trame déjà reçu)");
 					return null;
 				}
 			}
@@ -202,7 +214,7 @@ public class IO {
 		 * @param n
 		 * @return
 		 */
-		abstract Trame mk_rejet(int n);
+		//abstract Trame mk_rejet(int n);
 		/**
 		 * Outil pour la réception d'un ack. met à jour la fenêtre d'envoi
 		 * @param n
@@ -239,6 +251,7 @@ public class IO {
 	private Mode mode = null;
 	private boolean kill = false; // si vrai, on arrête tout même s'il nous restait des choses à envoyer
 	private boolean can_send = true; // vrai lorsque le récepteur peut recevoir plus de trame I
+	private Logger logger = null; // pour si on veut des traces
 	
 	private Object read_lock = new Lock(); // un objet quelqu'onque pour verouiller le buffer de lecture
 	private byte[] read_buffer = new byte[0]; // tableau contenant les bytes qui peuvent être lu de ce IO
@@ -252,7 +265,7 @@ public class IO {
 	private int write_len = 0; // nombre de byte restant à écrire
 	private IOOutputStream write_stream; // pour rajouter des bytes à envoyer dans les trames
 
-	private InputStream in_Stream; // pour lire les trames entrantes
+	private InputStream in_stream; // pour lire les trames entrantes
 	private int in_at = 0; // trame attendu
 	private Trame.I[] in_buffer = new Trame.I[8]; // buffer de trames entrantes; pour selective reject
 	private Object in_lock = new Lock();
@@ -276,6 +289,7 @@ public class IO {
 		public void run() {
 			self.queue_ctrl(Trame.p());
 			self.temporisateur.reset(this);
+			self.logln("N'a pas reçu P de puis un moment, renvoi");
 		}
 	};
 	private Marker temp_send = new Marker(this) { // temporisateur pour l'envoi des trames I si on ne reçoit pas de ack
@@ -284,6 +298,7 @@ public class IO {
 			synchronized (self.out_lock) {
 				self.out_at = self.out_start;
 			}
+			self.logln("N'a pas reçu de ACK de puis un moment, renvoi les trames I");
 		}
 	};
 	private Marker temp_ack = new Marker(this) { // temporisateur pour l'envoi des acks
@@ -292,6 +307,7 @@ public class IO {
 			Trame t = Trame.rr(self.in_at);
 			self.queue_ctrl(t);
 			self.temporisateur.reset(this);
+			self.logln("N'a pas reçu de trame I de puis un moment, renvoi RR");
 		}
 	};
 
@@ -301,7 +317,7 @@ public class IO {
 		this.chance_bit_errone = chance_bit_errone;
 		this.skip_erreur = this.chance_bit_errone == 0;
 		this.out_stream = output;
-		this.in_Stream = input;
+		this.in_stream = input;
 		this.in_thread = new InputThread(this);
 		this.out_thread = new OutputThread(this);
 		this.in_thread.start();
@@ -323,6 +339,7 @@ public class IO {
 						this.can_receive = true;
 						this.temporisateur.reset(temp_ack);
 						queue_ctrl(Trame.rr((this.in_at-1)%8));
+						this.logln("Peut maintenant recevoir des trames I");
 					}
 				}
 				// Étape 1: envoyer toutes les trames de controle
@@ -353,13 +370,14 @@ public class IO {
 		} catch (IOException e) {
 			System.err.println(e);
 		} finally {
-			// ferme le in_Stream
+			// ferme le in_stream
+			this.logln("Ferme les stream sortants");
 			try {
-				if (in_Stream != null) in_Stream.close();
+				if (out_stream != null) out_stream.close();
 			} catch (IOException e) {
 				System.err.println(e);
 			} finally {
-				in_Stream = null;
+				out_stream = null;
 			}
 			// signale qu'on peut arrêter
 			synchronized (this) {
@@ -370,7 +388,7 @@ public class IO {
 				this.out_buffer = null;
 			}
 		}
-		
+		this.close_all();
 	}
 	
 	/**
@@ -385,6 +403,7 @@ public class IO {
 					if (!t.isPresent()) { // stream fermé, on quitte
 						this.status = Status.CLOSED;
 					} else {
+						this.logln("<< " + t);
 						receive(t.get());
 					}
 				} catch (Trame.TrameException e) {
@@ -396,9 +415,10 @@ public class IO {
 			this.status = Status.CLOSED;
 			System.err.println(e);
 		} finally {
-			// ferme le in_Stream
+			// ferme le in_stream
+			this.logln("Ferme les stream entrant");
 			try {
-				if (out_stream != null) out_stream.close();
+				if (in_stream != null) in_stream.close();
 			} catch (IOException e) {
 				System.err.println(e);
 			} finally {
@@ -412,15 +432,15 @@ public class IO {
 				this.in_lock.notifyAll();
 				this.in_buffer = null;
 			}
+			this.close_all();
 		}
-		
-
 	}
 	/** gère la réception des trames de type inconnu
 	 * Ne devrait pas être appelé
 	*/
 	private boolean receive(Trame t) throws Trame.TrameException {
 		// on ignore
+		this.logln("\tignore");
 		return false;
 	}
 	/**
@@ -430,11 +450,15 @@ public class IO {
 	 * @throws Trame.TrameException
 	 */
 	private boolean receive(Trame.A t) throws Trame.TrameException {
-		if (this.status == Status.NEW || this.status == Status.CLOSED) { return false; } // ignore
+		if (this.status == Status.NEW || this.status == Status.CLOSED) { // ignore
+			this.logln("\tignore (aucune connexion)");
+			return false; 
+		} 
 		if (this.status == Status.WAITING) { // confirmation de la connection 
 			this.status = Status.CONNECTED; 
 			this.role = Role.CLIENT; 
 			synchronized (this) { this.notifyAll(); }
+			this.logln("\tactive la connexion");
 		}
 		
 		int n = t.getNum().get();
@@ -446,6 +470,7 @@ public class IO {
 			this.can_send = t.ready();
 		}
 		this.temporisateur.cancel(this.temp_send);
+		this.logln("\tprépare à l'envoi");
 		// indiquer si l'on peut envoyer plus de trame
 		return true;
 	}
@@ -464,9 +489,11 @@ public class IO {
 			queue_ctrl(Trame.rr(this.in_at));
 			queue_ctrl(Trame.p());
 			this.temporisateur.reset(temp_p);
+			this.logln("\tenvoi confirmation");
 			return true;
 		} else {
 			// ignore
+			this.logln("\tignore (pas de connexion)");
 			return false;
 		}
 	}
@@ -481,6 +508,7 @@ public class IO {
 			close_all();
 			return true;
 		}
+		this.logln("\tignore (pas de connexion)");
 		return false; // sinon ignore
 	}
 	/**
@@ -497,6 +525,7 @@ public class IO {
 			queue_ctrl(ret);
 			return true;
 		}
+		this.logln("\tignore (pas de connexion)");
 		return false;
 	}
 	/**
@@ -510,9 +539,11 @@ public class IO {
 		if (this.status == Status.CONNECTED){
 			queue_ctrl(Trame.p());
 			if (this.role == Role.SERVER) this.temporisateur.reset(this.temp_p);
+			this.logln("\trenvoi");
 			return true;
 		}
 		// sinon ignore
+		this.logln("\tignore (pas de connexion)");
 		return false;
 	}
 	/**
@@ -619,7 +650,7 @@ public class IO {
 	 */
 	private Optional<Boolean> read_next_bit() throws IOException{
 		if (this.status == Status.CLOSED || this.kill) return Optional.empty();
-		int b = this.in_Stream.read();
+		int b = this.in_stream.read();
 		if (b < 0) return Optional.empty();
 		return Optional.of(b != 0);
 	}
@@ -629,7 +660,7 @@ public class IO {
 	 */
 	private synchronized boolean close_all() {
 		this.status = Status.CLOSED;
-		while (this.in_Stream != null && this.out_stream != null) { // on attend
+		while (this.in_stream != null && this.out_stream != null) { // on attend
 			try {
 				this.wait();
 			} catch (InterruptedException e) {}
@@ -652,6 +683,7 @@ public class IO {
 	 */
 	private void send_trame(Trame trame) throws IOException {
 		if (this.status == Status.CLOSED || this.kill) return;
+		this.logln(">> " + trame);
 		Word bits = trame.encode(CRC.CRC_CCITT);
 		send_wout_stuffing(FLAG);
 		send_w_stuffing(bits);
@@ -816,6 +848,32 @@ public class IO {
 		}
 		return this.write_stream;
 	}
+	/**
+	 * Ajoute un logger. retourne l'ancien
+	 * @param logger
+	 * @return
+	 */
+	public Logger setLogger(Logger logger) {
+		Logger old = this.logger;
+		this.logger = logger;
+		return logger;
+	}
+	private void log(char msg) { if (this.logger != null) this.logger.print(msg); }
+	private void log(char[] msg) { if (this.logger != null) this.logger.print(msg); }
+	private void log(double msg) { if (this.logger != null) this.logger.print(msg); }
+	private void log(float msg) { if (this.logger != null) this.logger.print(msg); }
+	private void log(int msg) { if (this.logger != null) this.logger.print(msg); }
+	private void log(long msg) { if (this.logger != null) this.logger.print(msg); }
+	private void log(Object msg) { if (this.logger != null) this.logger.print(msg); }
+	private void log(String msg) { if (this.logger != null) this.logger.print(msg); }
+	private void logln(char msg) { if (this.logger != null) this.logger.println(msg); }
+	private void logln(char[] msg) { if (this.logger != null) this.logger.println(msg); }
+	private void logln(double msg) { if (this.logger != null) this.logger.println(msg); }
+	private void logln(float msg) { if (this.logger != null) this.logger.println(msg); }
+	private void logln(int msg) { if (this.logger != null) this.logger.println(msg); }
+	private void logln(long msg) { if (this.logger != null) this.logger.println(msg); }
+	private void logln(Object msg) { if (this.logger != null) this.logger.println(msg); }
+	private void logln(String msg) { if (this.logger != null) this.logger.println(msg); }
 
 	private static class IOInputStream extends InputStream {
 		private IO self;

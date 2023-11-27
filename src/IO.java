@@ -164,8 +164,8 @@ public class IO {
 							// parce qu'on efface les trames lu au fur et à mesure, on a pas besoins de les effacers ici
 						}
 						// envoyer une confirmation selon la place qu'il nous reste
-						n = n-1; // précédent
-						n = n<0? n+8 : n;
+						//n = n-1; // précédent
+						//n = n<0? n+8 : n;
 						if (self.read_len >= IO.MAX_BYTES_IN_BUFFER) {
 							self.temporisateur.cancel(self.temp_ack);
 							self.can_receive = false;
@@ -289,7 +289,7 @@ public class IO {
 	private Marker temp_ack = new Marker(this) { // temporisateur pour l'envoi des acks
 		@Override
 		public void run() {
-			Trame t = Trame.rr((self.in_at-1)%8);
+			Trame t = Trame.rr(self.in_at);
 			self.queue_ctrl(t);
 			self.temporisateur.reset(this);
 		}

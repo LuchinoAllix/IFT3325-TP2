@@ -26,6 +26,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 */
 	public int length;
 
+
 	// Pourquoi est-ce que java hais les bytes ?
 	/**
 	 * 0 Parce que c'est plus facile que tapper (byte)0 à chaque fois.
@@ -456,7 +457,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	public Word subWord(int start, int end) {
-		if (start < 0 || end >= this.length || end < start) throw new IndexOutOfBoundsException();
+		if (start < 0 || end > this.length || end < start) throw new IndexOutOfBoundsException();
 		return new Word(sub_word(this.array, start, end), end-start);
 	}
 	/**
@@ -607,34 +608,30 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	private static byte[] sub_word(byte[] src, int start, int end) {
+		if (start >= src.length*8 || start < 0 || end > src.length*8)  throw new IndexOutOfBoundsException();
 		// trois cas: start==end (trivial), start est un multiple de 8 (facile) et start n'est pas un multiple de 8 (difficile)
 		int so = start%8;
 		if (start == end) {
 			return new byte[0];
 		}
 		else if (so == 0) {
+			int len = end-start;
 			int fb = start/8; // index du premier byte
-			int lb = end/8; // index du dernier byte
-			// trouver l'index du dernier byte
-			//int lb = (end-1)/8; // -1 parce que le end ième bit est exclu, donc le end-1 ième bit est le dernier
-			int n = lb-fb+1; // nombre de byte. le seul cas où on aurait 0 byte est si start = end, ce qui est traité plus tôt
+			int lb = (end-1)/8; // index du dernier byte
+			int n = nb_byte_for_n_bit(len); // nombre de byte.
 			byte[] arr = new byte[n];
 			// juste copier tout
-			System.arraycopy(src, fb, arr, 0, lb-fb);
+			//System.out.println("copy byte "+ fb + " to " + lb);
+			System.arraycopy(src, fb, arr, 0, n);
 			return arr;
 		} else {
-			int fb = start/8; // index du premier byte
-			int lb = end/8; // index du dernier byte
 			int len = end-start; // nombre de bit
-			int n = len/8 + (len%8 == 0? 0 : 1); // nombre de byte dans le sous-mot
+			int n = nb_byte_for_n_bit(len); // nombre de byte dans le sous-mot
 			byte[] sub = new byte[n];
 
 			for (int i=0; i < n; i++) {
-				if (lb-fb == i) { // dans ce cas, fb+i est le dernier byte de this, alors il est inutile/on ne peut pas lire le bit d'après
-					sub[i] = (byte)((src[fb+i]&255) << so);
-				} else {
-					sub[i] = (byte)(((src[fb+i]&255) << so) | ((src[fb+i+1]&255) >>> (8-so)));
-				}
+				byte b = byte_at(src, src.length*8, i*8+start, false).value;
+				sub[i] = b;
 			}
 			return sub;
 		}
@@ -732,9 +729,16 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		byte[] result_arr = new byte[result_arr_len];
 
 		for (int i=0; i < result_arr_len; i+=1) {
-			byte b1 = (byte)(byte_at(a.array, a.length, i*8+first_bit, fill).value&255);
-			byte b2 = (byte)(byte_at(b.array, b.length, i*8+first_bit-alignment, fill).value&255);
+			int b1_pos = i*8+first_bit;
+			int b2_pos = i*8+first_bit-alignment;
+			byte b1 = (byte)(byte_at(a.array, a.length, b1_pos, fill).value&255);
+			byte b2 = (byte)(byte_at(b.array, b.length, b2_pos, fill).value&255);
 			byte rb = fun.apply(b1, b2);
+			/*if (t) {
+				System.out.println("B1 (" + b1_pos + ")" + stringifyByte(b1) + "; B2 (" + b2_pos + ")" + stringifyByte(b2) + "; RB (" + i*8 + ")" + stringifyByte(rb));
+				t = false;
+			}*/
+			//set_byte_at(result_arr, result_bit_len, i*8, rb);
 			result_arr[i] = rb;
 		}
 
@@ -802,37 +806,24 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		n = Math.max(Math.min(n, 8), 0);
 		if (at+n <= 0 || at >= bit_len) return new BitsRequest(fill? FULL : ZERO, ZERO, ZERO, ZERO);
 		else {
-			int mask = bit_mask(bit_len, at, at+n); // masque des bits pertinent dans le byte récolté
+			int to = at+n;
+			int mask = bit_mask(bit_len, at, to); // masque des bits pertinent dans le byte récolté
+			//System.out.println("MASK=" + stringifyByte((byte)mask));
 			int imask = (~mask)&255; // masque inverté
-			int len = Integer.bitCount(mask); // nombre de bits pertinent
+			int len = to <= bit_len? n : n - (to-bit_len); // nombre de bits pertinent
+			//System.out.println("LEN=" + len);
 			if (len == 0 || len > 8) throw new RuntimeException("What the fuck"); // ne devrait jamais arriver
-			int fbi = at/8; // index du premier byte
-			int sbi = (at+n)/8; // index du deuxième byte
-			if (fbi == sbi) { // cas ou tous les bits qui nous interessent sont dans le même byte
-				if (fbi < 0 || fbi >= arr.length) throw new RuntimeException("What the fuck 2 electric boogaloo"); // encore une fois, ne devrait jamais arriver
-				int old_byte = arr[fbi];
-				old_byte &= mask;
-				if (fill) old_byte |= imask;
-				return new BitsRequest((byte)old_byte, (byte)(at%8), (byte)len, (byte)mask);
-			}
-			else { // cas ou les bits desiree sont dans 2 bytes
-				int offset = at%8;
-				int fb, sb;
-				if (fbi < 0) fb = 0;
-				else {
-					// prend l'ancien byte
-					fb = arr[fbi]&255;
-					fb = fb << offset;
-				}
-				if (sbi >= arr.length) sb = 0;
-				else {
-					sb = arr[sbi]&255;
-					sb = sb >>> (8-offset);
-				}
-				int b = (fb|sb)&mask; // ancienne valeur
-				if (fill) b |= imask;			
-				return new BitsRequest((byte)b, (byte)(at%8), (byte)len, (byte)mask);
-			}
+			
+			int fbi = at < 0? -1 : at/8; // index du premier byte
+			int sbi = (to-1)/8; // index du deuxième byte
+			int fb = fbi < 0? (fill? FULL : ZERO) : arr[fbi];
+			int sb = sbi >= arr.length? (fill? FULL : ZERO) : arr[sbi];
+			int offset = at < 0? (at+8)%8 : at%8;
+			fb = (fb&255) << offset;
+			sb = (sb&255) >>> (8-offset);
+			int b = (fb|sb)&mask;
+			if (fill) b |= imask;
+			return new BitsRequest((byte)b, (byte)(at%8), (byte)len, (byte)mask);
 		}
 	}
 	/**
@@ -849,43 +840,43 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		n = Math.max(Math.min(n, 8), 0);
 		if (at+n <= 0 || at >= bit_len) return new BitsRequest(fill? FULL : ZERO, ZERO, ZERO, ZERO);
 		else {
-			int mask = bit_mask(bit_len, at, at+n); // masque des bits pertinent dans le byte récolté
+			int to = at+n;
+			int mask = bit_mask(bit_len, at, to); // masque des bits pertinent dans le byte récolté
+			//System.out.println("MASK=" + stringifyByte((byte)mask));
 			int imask = (~mask)&255; // masque inverté
-			int len = Integer.bitCount(mask); // nombre de bits pertinent
+			int len = to <= bit_len? n : n - (to-bit_len); // nombre de bits pertinent
 			if (len == 0 || len > 8) throw new RuntimeException("What the fuck"); // ne devrait jamais arriver
-			int fbi = at/8; // index du premier byte
-			int sbi = (at+n)/8; // index du deuxième byte
-			if (fbi == sbi) { // cas ou tous les bits qui nous interessent sont dans le même byte
-				if (fbi < 0 || fbi >= arr.length) throw new RuntimeException("What the fuck 2 electric boogaloo"); // encore une fois, ne devrait jamais arriver
-				int old_byte = arr[fbi];
-				int new_byte = (val&mask) | (old_byte&imask);
-				old_byte &= mask;
-				if (fill) old_byte |= imask;
-				arr[fbi] = (byte)new_byte;
-				return new BitsRequest((byte)old_byte, (byte)(at%8), (byte)len, (byte)mask);
+
+			// récolte du vieux byte
+			int fbi = at < 0? -1 : at/8; // index du premier byte
+			int sbi = (to-1)/8; // index du deuxième byte
+			int fb = fbi < 0? (fill? FULL : ZERO) : arr[fbi];
+			int sb = sbi >= arr.length? (fill? FULL : ZERO) : arr[sbi];
+			int offset = at < 0? (at+8)%8 : at%8;
+			int fbp = (fb&255) << offset;
+			int sbp = (sb&255) >>> (8-offset);
+			int b = (fbp|sbp)&mask;
+			if (fill) b |= imask;
+
+			// assigne le nouveau byte
+			int v = val&mask;
+			//System.out.println("VAL=" + stringifyByte((byte)v));
+			if (fbi >= 0) {
+				int fbv = v >>> offset;
+				int fbm = FULL << (8-offset);
+				int fbn = (fb&fbm)|fbv;
+				//System.out.println("FBV=" + stringifyByte((byte)fbv) + "; FBM=" + stringifyByte((byte)fbm) + " => " + stringifyByte((byte)fbn));
+				arr[fbi] = (byte)fbn;
 			}
-			else { // cas ou les bits desiree sont dans 2 bytes
-				int offset = at%8;
-				int fb, sb;
-				if (fbi < 0) fb = 0;
-				else {
-					// prend l'ancien byte
-					fb = arr[fbi]&255;
-					fb = fb << offset;
-					// assigne le nouveau
-					arr[fbi] = (byte)((arr[fbi]&first_bits_mask(offset)) | ((val&255)>>>offset));
-				}
-				if (sbi >= arr.length) sb = 0;
-				else {
-					sb = arr[sbi]&255;
-					sb = sb >>> (8-offset);
-					int m2 = last_bits_mask(8-((at+len)%8));
-					arr[sbi] = (byte)((arr[sbi]&m2) | (((val&255)<<(8-offset))&(~m2)&255));
-				}
-				int b = (fb|sb)&mask; // ancienne valeur
-				if (fill) b |= imask;			
-				return new BitsRequest((byte)b, (byte)(at%8), (byte)len, (byte)mask);
+			if (sbi < arr.length && sbi != fbi) {
+				int sbv = v << (8-offset);
+				int sbm = FULL >>> offset;
+				int sbn = (sb&sbm)|sbv;
+				//System.out.println("SBV=" + stringifyByte((byte)sbv) + "; SBM=" + stringifyByte((byte)sbm) + " => " + stringifyByte((byte)sbn));
+				arr[sbi] = (byte)sbn;
 			}
+
+			return new BitsRequest((byte)b, (byte)(at%8), (byte)len, (byte)mask);
 		}
 	}
 	/**
@@ -903,48 +894,43 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		n = Math.max(Math.min(n, 8), 0);
 		if (at+n <= 0 || at >= bit_len) return new ApplyBitsRequest(fill? FULL : ZERO, fun.apply(ZERO, ZERO), ZERO, ZERO, ZERO);
 		else {
-			int mask = bit_mask(bit_len, at, at+n); // masque des bits pertinent dans le byte récolté
+			int to = at+n;
+			int mask = bit_mask(bit_len, at, to); // masque des bits pertinent dans le byte récolté
 			int imask = (~mask)&255; // masque inverté
-			int len = Integer.bitCount(mask); // nombre de bits pertinent
+			int len = to <= bit_len? n : n - (to-bit_len); // nombre de bits pertinent
 			if (len == 0 || len > 8) throw new RuntimeException("What the fuck"); // ne devrait jamais arriver
-			int fbi = at/8; // index du premier byte
-			int sbi = (at+n)/8; // index du deuxième byte
-			if (fbi == sbi) { // cas ou tous les bits qui nous interessent sont dans le même byte
-				if (fbi < 0 || fbi >= arr.length) throw new RuntimeException("What the fuck 2 electric boogaloo"); // encore une fois, ne devrait jamais arriver
-				int old_byte = arr[fbi];
-				int new_byte = old_byte&imask;
-				old_byte &= mask;
-				new_byte |= fun.apply((byte)old_byte, (byte)(val&mask))&mask;
-				if (fill) old_byte |= imask;
-				arr[fbi] = (byte)new_byte;
-				return new ApplyBitsRequest((byte)old_byte, (byte)new_byte, (byte)(at%8), (byte)len, (byte)mask);
+			
+			// récolte du vieux byte
+			int fbi = at < 0? -1 : at/8; // index du premier byte
+			int sbi = (to-1)/8; // index du deuxième byte
+			int fb = fbi < 0? (fill? FULL : ZERO) : arr[fbi];
+			int sb = sbi >= arr.length? (fill? FULL : ZERO) : arr[sbi];
+			int offset = at < 0? (at+8)%8 : at%8;
+			int fbp = (fb&255) << offset;
+			int sbp = (sb&255) >>> (8-offset);
+			int b = (fbp|sbp)&mask;
+			if (fill) b |= imask;
+
+			// calcul le nouveau byte
+			int v = fun.apply((byte)b, val)&mask;
+
+			// assigne le nouveau byte
+			if (fbi >= 0) {
+				int fbv = v >>> offset;
+				int fbm = FULL << (8-offset);
+				int fbn = (fb&fbm)|fbv;
+				//System.out.println("FBV=" + stringifyByte((byte)fbv) + "; FBM=" + stringifyByte((byte)fbm) + " => " + stringifyByte((byte)fbn));
+				arr[fbi] = (byte)fbn;
 			}
-			else { // cas ou les bits desiree sont dans 2 bytes
-				int offset = at%8;
-				int fb, sb;
-				if (fbi < 0) fb = 0;
-				else {
-					// prend l'ancien byte
-					fb = arr[fbi]&255;
-					fb = fb << offset;
-				}
-				if (sbi >= arr.length) sb = 0;
-				else {
-					sb = arr[sbi]&255;
-					sb = sb >>> (8-offset);
-				}
-				int b = (fb|sb)&mask; // ancienne valeur
-				int nb = fun.apply((byte)b, (byte)(val&mask));
-				if (fbi >= 0) {
-					arr[fbi] = (byte)((arr[fbi]&first_bits_mask(offset)) | (nb>>>offset));
-				}
-				if (sbi < arr.length) {
-					int m2 = last_bits_mask(8-((at+len)%8));
-					arr[sbi] = (byte)((arr[sbi]&m2) | ((nb<<(8-offset))&(~m2)&255));
-				}
-				if (fill) b |= imask;			
-				return new ApplyBitsRequest((byte)b, (byte)nb, (byte)(at%8), (byte)len, (byte)mask);
+			if (sbi < arr.length && sbi != fbi) {
+				int sbv = v << (8-offset);
+				int sbm = FULL >>> offset;
+				int sbn = (sb&sbm)|sbv;
+				//System.out.println("SBV=" + stringifyByte((byte)sbv) + "; SBM=" + stringifyByte((byte)sbm) + " => " + stringifyByte((byte)sbn));
+				arr[sbi] = (byte)sbn;
 			}
+
+			return new ApplyBitsRequest((byte)b, (byte)v, (byte)(at%8), (byte)len, (byte)mask);
 		}
 	}
 	/**
@@ -961,48 +947,43 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		n = Math.max(Math.min(n, 8), 0);
 		if (at+n <= 0 || at >= bit_len) return new ApplyBitsRequest(fill? FULL : ZERO, fun.apply(ZERO), ZERO, ZERO, ZERO);
 		else {
-			int mask = bit_mask(bit_len, at, at+n); // masque des bits pertinent dans le byte récolté
+			int to = at+n;
+			int mask = bit_mask(bit_len, at, to); // masque des bits pertinent dans le byte récolté
 			int imask = (~mask)&255; // masque inverté
-			int len = Integer.bitCount(mask); // nombre de bits pertinent
+			int len = to <= bit_len? n : n - (to-bit_len); // nombre de bits pertinent
 			if (len == 0 || len > 8) throw new RuntimeException("What the fuck"); // ne devrait jamais arriver
-			int fbi = at/8; // index du premier byte
-			int sbi = (at+n)/8; // index du deuxième byte
-			if (fbi == sbi) { // cas ou tous les bits qui nous interessent sont dans le même byte
-				if (fbi < 0 || fbi >= arr.length) throw new RuntimeException("What the fuck 2 electric boogaloo"); // encore une fois, ne devrait jamais arriver
-				int old_byte = arr[fbi];
-				int new_byte = old_byte&imask;
-				old_byte &= mask;
-				new_byte |= fun.apply((byte)old_byte)&mask;
-				if (fill) old_byte |= imask;
-				arr[fbi] = (byte)new_byte;
-				return new ApplyBitsRequest((byte)old_byte, (byte)new_byte, (byte)(at%8), (byte)len, (byte)mask);
+			
+			// récolte du vieux byte
+			int fbi = at < 0? -1 : at/8; // index du premier byte
+			int sbi = (to-1)/8; // index du deuxième byte
+			int fb = fbi < 0? (fill? FULL : ZERO) : arr[fbi];
+			int sb = sbi >= arr.length? (fill? FULL : ZERO) : arr[sbi];
+			int offset = at < 0? (at+8)%8 : at%8;
+			int fbp = (fb&255) << offset;
+			int sbp = (sb&255) >>> (8-offset);
+			int b = (fbp|sbp)&mask;
+			if (fill) b |= imask;
+
+			// calcul le nouveau byte
+			int v = fun.apply((byte)b)&mask;
+
+			// assigne le nouveau byte
+			if (fbi >= 0) {
+				int fbv = v >>> offset;
+				int fbm = FULL << (8-offset);
+				int fbn = (fb&fbm)|fbv;
+				//System.out.println("FBV=" + stringifyByte((byte)fbv) + "; FBM=" + stringifyByte((byte)fbm) + " => " + stringifyByte((byte)fbn));
+				arr[fbi] = (byte)fbn;
 			}
-			else { // cas ou les bits desiree sont dans 2 bytes
-				int offset = at%8;
-				int fb, sb;
-				if (fbi < 0) fb = 0;
-				else {
-					// prend l'ancien byte
-					fb = arr[fbi]&255;
-					fb = fb << offset;
-				}
-				if (sbi >= arr.length) sb = 0;
-				else {
-					sb = arr[sbi]&255;
-					sb = sb >>> (8-offset);
-				}
-				int b = (fb|sb)&mask; // ancienne valeur
-				int nb = fun.apply((byte)b);
-				if (fbi >= 0) {
-					arr[fbi] = (byte)((arr[fbi]&first_bits_mask(offset)) | (nb>>>offset));
-				}
-				if (sbi < arr.length) {
-					int m2 = last_bits_mask(8-((at+len)%8));
-					arr[sbi] = (byte)((arr[sbi]&m2) | ((nb<<(8-offset))&(~m2)&255));
-				}
-				if (fill) b |= imask;			
-				return new ApplyBitsRequest((byte)b, (byte)nb, (byte)(at%8), (byte)len, (byte)mask);
+			if (sbi < arr.length && sbi != fbi) {
+				int sbv = v << (8-offset);
+				int sbm = FULL >>> offset;
+				int sbn = (sb&sbm)|sbv;
+				//System.out.println("SBV=" + stringifyByte((byte)sbv) + "; SBM=" + stringifyByte((byte)sbm) + " => " + stringifyByte((byte)sbn));
+				arr[sbi] = (byte)sbn;
 			}
+
+			return new ApplyBitsRequest((byte)b, (byte)v, (byte)(at%8), (byte)len, (byte)mask);
 		}
 	}
 
@@ -1600,6 +1581,18 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	public static String stringifyByte(byte b) { return stringifyByte(b, (byte)8); }
 	@Override
 	public String toString() {
+		/*
+		String s = "";
+		for (int i=0; i<this.array.length; i+=1) {
+			if (i != 0) s += " ";
+			if (i == this.array.length-1) {
+				s += stringifyByte(this.array[i], (byte)(this.length%8));
+			} else {
+				s += stringifyByte(this.array[i]);
+			}
+		}
+		return s;
+		*/
 		return this.toString(0);
 	}
 	/**
@@ -1609,16 +1602,13 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 */
 	public String toString(int offset) {
 		String s = " ".repeat(offset+(offset/8));
-		int count = offset%8;
-		while (count < this.array.length) {
-			byte b = this.array[count];
-			if (count != this.array.length-1) {
-				s += stringifyByte(b, (byte)8);
-				s += " ";
-			} else {
-				s += stringifyByte(b, (byte)(this.length - 8*count));
-			}
-			count += 1;
+		int o = offset%8;
+		int count = 0;
+		while (count < this.length) {
+			if (count != 0) s += " ";
+			BitsRequest bs = n_bits_at(this.array, this.length, count, count==0? 8-o : 8, false);
+			s += stringifyByte(bs.value, bs.len);
+			count += bs.len;
 		}
 		return s;
 	}
@@ -1642,16 +1632,16 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	public Optional<Integer> firstOne(int from, int to) {
+		if (this.length == 0) return Optional.empty();
 		from = Math.max(0, from);
 		to = Math.min(this.length, to);
-		if (from < to) return this.firstOne(to, from);
+		if (from > to) return this.firstOne(to, from);
 
-		for (int i=from; i < to; i+=1) {
-			int bi = i/8;
-			int v = this.array[bi] & bitMask(from, to);
-			//v = i == this.array.length - 1? v&first_bits_mask(this.length%8) : v;
-			if (v != 0) {
-				int at = i + (7-fast_log2(Integer.highestOneBit(v)));
+		for (int i=from/8; i <= (to-1)/8; i+=1) {
+			int v = this.array[i] & 255; // bitMask(from, to)
+			int n = Integer.numberOfLeadingZeros(v)-24; if (n < 0) n = 0;
+			if (n < 8 ) {
+				int at = i*8 + n;
 				return at >= from && at < to? Optional.of(at) : Optional.empty();
 			}
 		}
@@ -1678,16 +1668,17 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	public Optional<Integer> lastOne(int from, int to) {
+		if (this.length == 0) return Optional.empty();
 		from = Math.max(0, from);
 		to = Math.min(this.length, to);
-		if (from < to) return this.firstOne(to, from);
+		if (from > to) return this.firstOne(to, from);
 
-		for (int i=to-1; i >= from; i-=1) {
-			int bi = i/8;
-			int v = this.array[bi] & bitMask(from, to);
-			//v = i == this.array.length - 1? v&first_bits_mask(this.length%8) : v;
-			if (v != 0) {
-				int at = i + (7-fast_log2(Integer.highestOneBit(v)));
+		for (int i=(to-1)/8; i >= from/8; i-=1) {
+			int v = this.array[i] & bitMask(i*8, to); // bitMask(from, to)
+			int n = Integer.numberOfTrailingZeros(v);
+			if (n < 8 ) {
+				int at = i*8 + (7-n);
+				//System.out.println("at: " + at + "; from: " + from + "; to: " + to);
 				return at >= from && at < to? Optional.of(at) : Optional.empty();
 			}
 		}
@@ -1712,16 +1703,16 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	public Optional<Integer> firstZero(int from, int to) {
+		if (this.length == 0) return Optional.empty();
 		from = Math.max(0, from);
 		to = Math.min(this.length, to);
-		if (from < to) return this.firstOne(to, from);
+		if (from > to) return this.firstOne(to, from);
 
-		for (int i=from; i < to; i+=1) {
-			int bi = i/8;
-			int v = (~this.array[bi]) & bitMask(from, to);
-			//v = i == this.array.length - 1? v&first_bits_mask(this.length%8) : v;
-			if (v != 0) {
-				int at = i + (7-fast_log2(Integer.highestOneBit(v)));
+		for (int i=from/8; i <= to/8; i+=1) {
+			int v = (~this.array[i]) & 255; // bitMask(from, to)
+			int n = Integer.numberOfLeadingZeros(v)-24; if (n < 0) n = 0;
+			if (n < 8 ) {
+				int at = i*8 + n;
 				return at >= from && at < to? Optional.of(at) : Optional.empty();
 			}
 		}
@@ -1746,16 +1737,16 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	public Optional<Integer> lastZero(int from, int to) {
+		if (this.length == 0) return Optional.empty();
 		from = Math.max(0, from);
 		to = Math.min(this.length, to);
-		if (from < to) return this.firstOne(to, from);
+		if (from > to) return this.firstOne(to, from);
 
-		for (int i=to-1; i >= from; i-=1) {
-			int bi = i/8;
-			int v = (~this.array[bi]) & bitMask(from, to);
-			//v = i == this.array.length - 1? v&first_bits_mask(this.length%8) : v;
-			if (v != 0) {
-				int at = i + (7-fast_log2(Integer.highestOneBit(v)));
+		for (int i=(to-1)/8; i >= from/8; i-=1) {
+			int v = (~this.array[i]) & bitMask(i*8, to); // bitMask(from, to)
+			int n = Integer.numberOfTrailingZeros(v);
+			if (n < 8 ) {
+				int at = i*8 + 7-n;
 				return at >= from && at < to? Optional.of(at) : Optional.empty();
 			}
 		}
@@ -1981,24 +1972,6 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		if( num == 0 ) return 0;
     	return 31 - Integer.numberOfLeadingZeros(num);
 	}
-	/*
-	private static int fast_log2(byte num) {
-		if( num == 0 ) return 0;
-    	return 31 - Integer.numberOfLeadingZeros(num&255);
-	}
-	private static long fast_log2_ceil(long num) {
-		if( num == 0 ) return 0;
-    	return 64 - Long.numberOfLeadingZeros(num - 1);
-	}
-	private static int fast_log2_ceil(int num) {
-		if( num == 0 ) return 0;
-    	return 32 - Integer.numberOfLeadingZeros(num - 1);
-	}
-	private static int fast_log2_ceil(byte num) {
-		if( num == 0 ) return 0;
-    	return 32 - Integer.numberOfLeadingZeros((num&255) - 1);
-	}
-	*/
 
 	/**
 	 * masque n'ayant que les n premier bit (fait pour être utiliser avec des byte donc n'utilise que les 8 derniers bits)
@@ -2041,7 +2014,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	@SuppressWarnings("unused")
-	private static int bit_mask_at(int at) { // on assume toujours que le premier bit est a gauche
+	public static int bit_mask_at(int at) { // on assume toujours que le premier bit est a gauche
 		if (at <= 0 || at > 8) return 0;
 		return 128 >>> (at-1);
 	}
@@ -2053,7 +2026,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	@SuppressWarnings("unused")
-	private static int bit_mask_at_inv(int at) { // comme précédent, mais le premier bit est a droite
+	public static int bit_mask_at_inv(int at) { // comme précédent, mais le premier bit est a droite
 		if (at <= 0 || at > 8) return 0;
 		return 1 << (at-1);
 	}
@@ -2064,23 +2037,20 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param to
 	 * @return
 	 */
-	private static int bit_mask(int len, int from, int to) {
-		if (from > to) {
-			int tmp = from;
-			from = to;
-			to = tmp;
-		}
-		int l = Math.min(Math.min(8, to-from), len-to);
-		if (l == 0 || from+l < 0 || from >= len) return 0;
-		int mask = 255;
-		if (from < 0) mask &= last_bits_mask(8-from);
-		if (from+l < 8) mask &=first_bits_mask(from+l);
-		return mask;
+	public static int bit_mask(int len, int from, int to) {
+		int off_left = from < 0? -from : 0;
+		if (off_left >= 8) return 0;
+		to = to-from;
+		if (to < 0) return 0;
+		else if (to > 8-off_left) to = 8-off_left;
+		int off_right = 8-to-off_left;
+		if (off_right == 0) return 255 >>> off_left;
+		return (255 >>> off_left+off_right) << off_right;
 	}
 	/**
 	 *  inverse les len premiers bits du byte
 	*/ 
-	private static byte reverse(byte b, int len) {
+	public static byte reverse(byte b, int len) {
 		// puisque c'est pour usage interne, on va assumer que 0 <= len <= 8
 		if (len == 0) return 0;
 		if (b == 0 || b == (byte)255) return b; // il y a 16 'palindrome' mais j'ai pas envie de tester pour tout alors je ne fais que les plus simples
@@ -2099,17 +2069,26 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		return (byte)(Integer.reverseBytes(b&255) >>> 24);
 	}
 
+	/**
+	 * Donne le nombre nécessaire de byte pour stocker n bits
+	 * @param n
+	 * @return
+	 */
+	public static int nb_byte_for_n_bit(int n) {
+		if (n < 0) throw new IllegalArgumentException("n ne peut pas être négatif");
+		return n/8 + (n%8==0? 0 : 1);
+	}
 
 	/**
 	 * Fonction prenant 2 bytes en paramètre
 	 */
-	private static interface ByteFunc {
+	public static interface ByteFunc {
 		byte apply(byte a, byte b);
 	}
 	/**
 	 * fonction prenant un byte en paramètre
 	 */
-	private static interface UnaryByteFunc {
+	public static interface UnaryByteFunc {
 		byte apply(byte b);
 	}
 	/**

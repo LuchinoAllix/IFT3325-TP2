@@ -77,11 +77,17 @@ public class CRC {
      * @return le générateur
      */
     private static Word mk_gen(Word src) {
-         int from = src.firstOne().orElseThrow(() -> new IllegalArgumentException());
-        if (from==0)
-            return src;
-        else
-            return src.subWord(from, src.length);
+        Optional<Integer> fo = src.firstOne();
+        if (fo.isEmpty()) throw new IllegalArgumentException("Le générateur ne peut être 0");
+        //System.out.println("FO: " + fo.get());
+        Word gen = src.subWord(fo.get(), src.length);
+        //System.out.println("SRC " + src);
+        //System.out.println("GEN " + gen.toString(fo.get()));
+       // System.out.println("GEN: " + gen);
+        //System.out.println(Word.stringifyByte(gen.getByteAt(-1).value()));
+        //System.out.println(Word.stringifyByte(gen.getByteAt(-2).value()));
+        //System.out.println(Word.stringifyByte(gen.getByteAt(0).value()));
+        return gen;
     }
     /**
      * Calcule le code vérificateur en ajoutant <code>codeLength()</code> 0 à la fin de <code>msg</code>
@@ -96,11 +102,23 @@ public class CRC {
         // extend le message avec des 0s
         Word padded_msg = Word.zeroExtend(msg, len);
         Optional<Integer> align = padded_msg.firstOne();
+        int max_iter = msg.length;
+        int i = 0;
+        //System.out.println("début de la boucle");
         while (align.isPresent() && align.get() < msg.length) {
+            if (i >= max_iter) throw new RuntimeException();
+            else i+=1;
+            int a = align.get();
+            //System.out.println("\t"+padded_msg + " ; l="+a);
+            //System.out.println("\t"+gen.toString(a));
             // dans la boucle, on est certain que l'on est aligné avec un 1, alors on peut xor
-            padded_msg = Word.xor(padded_msg, gen, align.get(), Word.ApplyMode.FIRST); // mode a first parce que l'on veut garder uniquement les bits de padded_msg
-            align = padded_msg.firstOne(align.get());
+            padded_msg = Word.xor(padded_msg, gen, a, Word.ApplyMode.FIRST); // mode a first parce que l'on veut garder uniquement les bits de padded_msg
+            align = padded_msg.firstOne(a);
+            //System.out.println("\t-----------------------------------------");
+            //System.out.println("\t"+padded_msg + " ; l="+align.orElse(-1));
+            
         }
+        //System.out.println("fin de la boucle");
         // retourne les len derniers bits
         return padded_msg.subWord(msg.length, padded_msg.length);
     }

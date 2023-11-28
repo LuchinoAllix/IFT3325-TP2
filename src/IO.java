@@ -10,11 +10,11 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * Classe gérant l'échange de trame d'un point à l'autre
- * Tu lui fournit deux stream pour les bits sortant et entrant et elle va s'occuper d'attendre les trames et de récupérer les msg.
- * Ne ferme pas les streams originaux à la fin alors tu dois t'en occuper toi même.
+ * Classe gérant l'échange de trame d'un point à l'autre.
+ * Tu lui fournit deux stream pour les bits sortant et entrant et elle va s'occuper d'attendre les trames et de récupérer les messages.
+ * Ne ferme pas les streams originaux à la fin alors il faut s'en occuper manuellement.
  * 
- * À l'interne, utilise deux thread pour la lecture et l'écriture des signaux entrant/sortant. 
+ * À l'interne, utilise deux threads pour la lecture et l'écriture des signaux entrant/sortant. 
  * Les opérations sont synchronisées pour éviter que les threads se pile sur les pieds. 
  * L’envoi et la réception se fait bit par bit.
  * 
@@ -30,14 +30,14 @@ import java.util.TimerTask;
  * <li>Envoyer le plus de trame I possible</li>
  * </ol>
  * <p>
- * Pour créer la prochaine trame I, la méthode <code>mkNextTrame()</code> est appelé. Celle-ci prend jusqu'à 1024 bytes du buffer d'écriture comme message de trame. S'il n'y a plus de byte à envoyer, elle retourne rien et on passe à la prochaine itération.
+ * Pour créer la prochaine trame I, la méthode <code>mkNextTrame()</code> est appelée. Celle-ci prend jusqu'à 1024 bytes du buffer d'écriture comme message de trame. S'il n'y a plus de byte à envoyer, elle retourne rien et on passe à la prochaine itération.
  * </p>
  * <p>
  * L'envoi d'une trame se déroule comme suit:
  * </p>
  * <ol>
- * <li>La trame est encodé avec <code>CRC_CCITT</code> et transformé en chaîne de bits</li>
- * <li>n envoi (sans bit stuffing) le flag de début de trame</li>
+ * <li>La trame est encodée avec <code>CRC_CCITT</code> et transformée en chaîne de bits</li>
+ * <li>on envoi (sans bit stuffing) le flag de début de trame</li>
  * <li>on envoi (avec bit stuffing) la chaîne</li>
  * <li>on envoi (sans bit stuffing) le flag de fin de trame</li>
  * <li>on envoi <code>11111111</code> pour bien délimiter --- Ça permet de ne pas inventer une trame s'il y avait une erreur dans la précédentes et qu'on avait abandonner la lecture</li>
@@ -45,7 +45,7 @@ import java.util.TimerTask;
  * 
  * <h3>Réception de trame</h3>
  * <p>
- * La recherche de la prochaine trame reçu se déroule de la manière suivante:
+ * La recherche de la prochaine trame reçue se déroule de la manière suivante:
  * </p>
  * <ol>
  * <li>On lit les bits reçu jusqu'à ce que l'on trouve le flag de début de trame</li>
@@ -56,12 +56,12 @@ import java.util.TimerTask;
  * 
  * <h3>Traitement d'une trame</h3>
  * <p>
- * Toute les trames sont ignorées si la connexion est fermé. 
- * Si le status est à NEW, toute les trames sont ignorées sauf les trames C. 
+ * Toutes les trames sont ignorées si la connexion est fermée. 
+ * Si le status est à NEW, toutes les trames sont ignorées sauf les trames C. 
  * En status WAITING, tout est ignoré sauf les trames F et R.
  * </p>
  * <p>
- * Autrement, la trame est traité selon le son type et le mode.
+ * Autrement, la trame est traitée selon le son type et le mode.
  * </p>
  * <h4>A (RR et RNR)</h4>
  * <p>Lorsque l'on reçoit une trame A, les choses suivantes se passent:</p>
@@ -106,13 +106,13 @@ import java.util.TimerTask;
  * </p>
  * <p>
  * Une fois établi, l'objet donne accès à un <code>OutputStream</code> pour envoyer des données. 
- * Tout les bytes que ce stream reçoit sont ajouter à un buffer d'écriture et ils seront utilisés pour créer les trames I. 
+ * Tous les bytes que ce stream reçoit sont ajoutés à un buffer d'écriture et ils seront utilisés pour créer les trames I. 
  * De l'autre côté, il suffit de prendre l'<code>InputStream</code> que fourni l'objet afin d'y lire les bytes dans son buffer de lecture.
  * </p>
  * <p>
  * À la fin, il est important d'appeler la méthode <code>fermeConnexion</code> afin d'arrêter les threads et de libérer les ressources. 
  * IO ne ferme pas les streams qui lui sont donné au début. 
- * Il faudra donc les fermer vous même.
+ * Il faudra donc les fermer manuellement.
  * </p>
  * 
  * <h3>Temporisateur</h3>

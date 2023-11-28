@@ -26,7 +26,7 @@ public class Sender{
 
 	public static void main(String[] args) {
 		int port = 0;
-		int méthode = 0; // Comment spécifier ?
+		int méthode = 0;
 		String machine = "";
 		if(args.length !=4){System.out.println("Il faut 4 arguments.");System.exit(0);}
 

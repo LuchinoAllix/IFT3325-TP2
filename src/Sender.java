@@ -1,27 +1,24 @@
 import java.net.*;
 import java.io.*;
-import java.util.Scanner;
-
 
 public class Sender{
-	
-	/* Ce que cette classe doit faire :
-	 * • Lire des données de fichier,
-	 * • Produire des trames et les envoyer,
-	 * • Attendre et traiter les accusés de réception,
-	 * • Ré-envoyer les données en cas de perte ou d’erreur.
-	*/
 
-	private Socket clientSocket;
-	private IO io;
+	private static Socket clientSocket;
+	private static InputStream in_stream;
+	private static OutputStream out_stream;
+	private static IO io;
+	private static PrintStream writer;
 
-	public void startConnection(String ip, int port) throws UnknownHostException, IOException {
+	public static void startConnection(String ip, int port) throws UnknownHostException, IOException {
 		clientSocket = new Socket(ip, port);
-		io = new IO(clientSocket.getInputStream(),clientSocket.getOutputStream());
+		in_stream = clientSocket.getInputStream();
+		out_stream = clientSocket.getOutputStream();
+		io = new IO(in_stream,out_stream);
+		writer = new PrintStream(io.getOutputStream());
 	}
 
 
-	public void stopConnection() throws IOException {
+	public static void stopConnection() throws IOException {
 		io.getInputStream().close();
 		io.getOutputStream().close();
 		clientSocket.close();
@@ -29,34 +26,34 @@ public class Sender{
 
 	public static void main(String[] args) {
 		int port = 0;
-		int méthode = 0;
+		int méthode = 0; // Comment spécifier ?
 		String machine = "";
 		if(args.length !=4){System.out.println("Il faut 4 arguments.");System.exit(0);}
+
 		try {
 			port = Integer.parseInt(args[1]);
 			méthode = Integer.parseInt(args[3]);
 			File file = new File(args[2]);
 			FileInputStream input = new FileInputStream(file);
+			
+			startConnection(machine, port);
+			writer.print(input);
+			
+			// Quelle condition pour arrêter le sender ?
+			stopConnection();
 		} catch (NumberFormatException e) {
 			System.out.println("Le numéro de port et la méthode doivent être des entiers.");
 			System.exit(0);
 		} catch (FileNotFoundException e) {
 			System.out.println("Fichier mentionné non trouvé.");
 			System.exit(0);
-		}
-
-		Sender client = new Sender();
-		try {
-			client.startConnection(machine, port);
-			// Comment envoyer des data ?
-			
-			// Quelle condition pour arrêter le client ?
-			client.stopConnection();
-
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+			System.exit(0);
 		} catch (IOException e) {
 			e.printStackTrace();
-		} 
-		
+			System.exit(0);
+		}
 
 		
 	}

@@ -3,7 +3,7 @@ import java.io.*;
 import java.util.Scanner;
 
 
-public class Emetteur{
+public class Sender{
 	
 	/* Ce que cette classe doit faire :
 	 * • Lire des données de fichier,
@@ -45,7 +45,7 @@ public class Emetteur{
 			System.exit(0);
 		}
 
-		Emetteur client = new Emetteur();
+		Sender client = new Sender();
 		try {
 			client.startConnection(machine, port);
 			// Comment envoyer des data ?

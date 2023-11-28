@@ -3,7 +3,7 @@ import java.io.*;
 
 // Source socket : https://www.baeldung.com/a-guide-to-java-sockets
 
-public class Recepteur{
+public class Receiver{
 	/* Ce que cette classe doit faire :
 	 * • Recevoir des trames
 	 * • Vérifier la présence d’erreurs ou non dans les trames reçues
@@ -38,7 +38,7 @@ public class Recepteur{
 			System.exit(0);
 		}
 		
-		Recepteur server = new Recepteur();
+		Receiver server = new Receiver();
 		try {
 			server.start(port);
 			// Quelle condition pour stop le server ?

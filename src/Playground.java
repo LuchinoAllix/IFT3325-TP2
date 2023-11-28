@@ -20,7 +20,9 @@ public class Playground {
 		*/
 		
 		test_crc("0110111010111001001", "1110011010011001");
-		Word cc = new Word("10001000000100001");
+		//Word cc = new Word("10001000000100001");
+		test_print_trame();
+
 		
 	}
 
@@ -31,5 +33,17 @@ public class Playground {
 		System.out.println("CRC pour " + word);
 		System.out.println("" + crc + " (" + wgoal + ") " + crc.equals(wgoal));
 		System.out.println(CRC.CRC_CCITT.isValid(Word.concat(word, crc)));
+	}
+
+	static void test_print_trame() {
+		System.out.println(Trame.gbn());
+		System.out.println(Trame.selectiveRej());
+		System.out.println(Trame.p());
+		System.out.println(Trame.i(0, new Word("0110111010111001001")));
+		System.out.println(Trame.rr(0));
+		System.out.println(Trame.rnr(0));
+		System.out.println(Trame.rej(0));
+		System.out.println(Trame.srej(0));
+		System.out.println(Trame.end());
 	}
 }

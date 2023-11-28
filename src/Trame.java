@@ -1,5 +1,7 @@
 import java.util.Optional;
 
+import javax.swing.text.html.Option;
+
 /**
  * Représentation d'une trame. Ne contient pas le flag parce que c'est toujours le même pis que l'emmetteur peut décider d'utiliser celui qu'il veut.
  * 
@@ -27,6 +29,32 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 	 * @return encodage du numéro de la trame
 	 */
 	public byte getNumByte() { return 0; }
+
+	/**
+	 * Indique ce qui doit être indiquer dans la section 'type' de la repr String d'une trame. Ne peut pas être null
+	 * @return
+	 */
+	String print_type() { return this.getType().toString(); }
+	/**
+	 * Indique ce qui doit être indiquer dans la section 'num' de la repr String d'une trame. Peut être null
+	 * @return
+	 */
+	String print_num() { return this.getNum().map(n -> n.toString()).orElse(null); }
+	/**
+	 * Indique ce qui doit être indiquer dans la section 'msg' de la repr String d'une trame. Peut être null
+	 * @return
+	 */
+	String print_msg() { return this.getMsg().map(m -> m.toString()).orElse(null); }
+
+	@Override
+	public String toString() {
+		String s = "[" + print_type();
+		String num = print_num();
+		String msg = print_msg();
+		if (num != null) s += "|" + num;
+		if (msg != null) s += "|" + msg;
+		return s + "]";
+	}
 
 	/**
 	 * Trame d'information. C'est la seule trame qui contient un message
@@ -76,6 +104,10 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 		public byte getNumByte() {
 			return (byte)Character.forDigit(this.num, 10);
 		}
+		@Override
+		String print_num() {
+			return goBackN()? "GBN" : "SELREJ";
+		}
 	}
 	/**
 	 * Trame d'aquitement (RR et RNR)
@@ -101,6 +133,10 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 		public byte getNumByte() {
 			if ((this.num&128) == 0) return (byte)Character.forDigit(this.num, 10);
 			else return (byte)num;
+		}
+		@Override
+		String print_type() {
+			return ready()? "RR" : "RNR";
 		}
 	}
 	/**
@@ -128,7 +164,10 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 			if ((this.num&128) == 0) return (byte)Character.forDigit(this.num, 10);
 			else return (byte)num;
 		}
-
+		@Override
+		String print_type() {
+			return selectif()? "SREJ" : "REJ";
+		}
 	}
 	/**
 	 * Trame de fin de connexion

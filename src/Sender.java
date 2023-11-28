@@ -33,6 +33,7 @@ public class Sender{
 		try {
 			port = Integer.parseInt(args[1]);
 			méthode = Integer.parseInt(args[3]);
+			IO.Mode mode = IO.Mode.fromNum(méthode);
 			File file = new File(args[2]);
 			FileInputStream input = new FileInputStream(file);
 			

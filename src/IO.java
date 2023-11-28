@@ -354,6 +354,20 @@ public class IO {
 		 * @return
 		 */
 		abstract Trame.C open();
+		public static Mode fromNum(int n) {
+			return switch (n) {
+				case 0 -> Mode.GBN;
+				case 1 -> Mode.SELECT;
+				default -> throw new IllegalArgumentException("numéro invalide");
+			};
+		}
+		public static int numOf(Mode m) {
+			return switch (m) {
+				case GBN -> 0;
+				case SELECT -> 0;
+			};
+		}
+		public int num() {return numOf(this);}
 	}
 	/**
 	 * le nombre maximal de bytes qu'on met dans le buffer avant d'envoyer un RNR

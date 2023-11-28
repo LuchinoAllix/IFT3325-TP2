@@ -824,32 +824,6 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 			int b = (fb|sb)&mask;
 			if (fill) b |= imask;
 			return new BitsRequest((byte)b, (byte)(at%8), (byte)len, (byte)mask);
-
-			/*if (fbi == sbi) { // cas ou tous les bits qui nous interessent sont dans le même byte
-				//if (fbi < 0 || fbi >= arr.length) throw new RuntimeException("What the fuck 2 electric boogaloo"); // encore une fois, ne devrait jamais arriver
-				int old_byte = fbi < 0? (fill? FULL : ZERO) : arr[fbi];
-				old_byte &= mask;
-				if (fill) old_byte |= imask;
-				return new BitsRequest((byte)old_byte, (byte)(at%8), (byte)len, (byte)mask);
-			}
-			else { // cas ou les bits desiree sont dans 2 bytes
-				int offset = at%8;
-				int fb, sb;
-				if (fbi < 0) fb = 0;
-				else {
-					// prend l'ancien byte
-					fb = arr[fbi]&255;
-					fb = fb << offset;
-				}
-				if (sbi >= arr.length) sb = 0;
-				else {
-					sb = arr[sbi]&255;
-					sb = sb >>> (8-offset);
-				}
-				int b = (fb|sb)&mask; // ancienne valeur
-				if (fill) b |= imask;			
-				return new BitsRequest((byte)b, (byte)(at%8), (byte)len, (byte)mask);
-			}*/
 		}
 	}
 	/**
@@ -903,41 +877,6 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 			}
 
 			return new BitsRequest((byte)b, (byte)(at%8), (byte)len, (byte)mask);
-			/*
-			int fbi = at/8; // index du premier byte
-			int sbi = (at+n-1)/8; // index du deuxième byte
-			if (fbi == sbi) { // cas ou tous les bits qui nous interessent sont dans le même byte
-				if (fbi < 0 || fbi >= arr.length) throw new RuntimeException("What the fuck 2 electric boogaloo"); // encore une fois, ne devrait jamais arriver
-				int old_byte = arr[fbi];
-				int new_byte = (val&mask) | (old_byte&imask);
-				old_byte &= mask;
-				if (fill) old_byte |= imask;
-				arr[fbi] = (byte)new_byte;
-				return new BitsRequest((byte)old_byte, (byte)(at%8), (byte)len, (byte)mask);
-			}
-			else { // cas ou les bits desiree sont dans 2 bytes
-				int offset = at%8;
-				int fb, sb;
-				if (fbi < 0) fb = 0;
-				else {
-					// prend l'ancien byte
-					fb = arr[fbi]&255;
-					fb = fb << offset;
-					// assigne le nouveau
-					arr[fbi] = (byte)((arr[fbi]&first_bits_mask(offset)) | ((val&255)>>>offset));
-				}
-				if (sbi >= arr.length) sb = 0;
-				else {
-					sb = arr[sbi]&255;
-					sb = sb >>> (8-offset);
-					int m2 = last_bits_mask(8-((at+len)%8));
-					arr[sbi] = (byte)((arr[sbi]&m2) | (((val&255)<<(8-offset))&(~m2)&255));
-				}
-				int b = (fb|sb)&mask; // ancienne valeur
-				if (fill) b |= imask;			
-				return new BitsRequest((byte)b, (byte)(at%8), (byte)len, (byte)mask);
-			}
-			*/
 		}
 	}
 	/**
@@ -992,46 +931,6 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 			}
 
 			return new ApplyBitsRequest((byte)b, (byte)v, (byte)(at%8), (byte)len, (byte)mask);
-			/*
-			int fbi = at/8; // index du premier byte
-			int sbi = (at+n)/8; // index du deuxième byte
-			if (fbi == sbi) { // cas ou tous les bits qui nous interessent sont dans le même byte
-				if (fbi < 0 || fbi >= arr.length) throw new RuntimeException("What the fuck 2 electric boogaloo"); // encore une fois, ne devrait jamais arriver
-				int old_byte = arr[fbi];
-				int new_byte = old_byte&imask;
-				old_byte &= mask;
-				new_byte |= fun.apply((byte)old_byte, (byte)(val&mask))&mask;
-				if (fill) old_byte |= imask;
-				arr[fbi] = (byte)new_byte;
-				return new ApplyBitsRequest((byte)old_byte, (byte)new_byte, (byte)(at%8), (byte)len, (byte)mask);
-			}
-			else { // cas ou les bits desiree sont dans 2 bytes
-				int offset = at%8;
-				int fb, sb;
-				if (fbi < 0) fb = 0;
-				else {
-					// prend l'ancien byte
-					fb = arr[fbi]&255;
-					fb = fb << offset;
-				}
-				if (sbi >= arr.length) sb = 0;
-				else {
-					sb = arr[sbi]&255;
-					sb = sb >>> (8-offset);
-				}
-				int b = (fb|sb)&mask; // ancienne valeur
-				int nb = fun.apply((byte)b, (byte)(val&mask));
-				if (fbi >= 0) {
-					arr[fbi] = (byte)((arr[fbi]&first_bits_mask(offset)) | (nb>>>offset));
-				}
-				if (sbi < arr.length) {
-					int m2 = last_bits_mask(8-((at+len)%8));
-					arr[sbi] = (byte)((arr[sbi]&m2) | ((nb<<(8-offset))&(~m2)&255));
-				}
-				if (fill) b |= imask;			
-				return new ApplyBitsRequest((byte)b, (byte)nb, (byte)(at%8), (byte)len, (byte)mask);
-			}
-			*/
 		}
 	}
 	/**
@@ -1085,47 +984,6 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 			}
 
 			return new ApplyBitsRequest((byte)b, (byte)v, (byte)(at%8), (byte)len, (byte)mask);
-
-			/*
-			int fbi = at/8; // index du premier byte
-			int sbi = (at+n)/8; // index du deuxième byte
-			if (fbi == sbi) { // cas ou tous les bits qui nous interessent sont dans le même byte
-				if (fbi < 0 || fbi >= arr.length) throw new RuntimeException("What the fuck 2 electric boogaloo"); // encore une fois, ne devrait jamais arriver
-				int old_byte = arr[fbi];
-				int new_byte = old_byte&imask;
-				old_byte &= mask;
-				new_byte |= fun.apply((byte)old_byte)&mask;
-				if (fill) old_byte |= imask;
-				arr[fbi] = (byte)new_byte;
-				return new ApplyBitsRequest((byte)old_byte, (byte)new_byte, (byte)(at%8), (byte)len, (byte)mask);
-			}
-			else { // cas ou les bits desiree sont dans 2 bytes
-				int offset = at%8;
-				int fb, sb;
-				if (fbi < 0) fb = 0;
-				else {
-					// prend l'ancien byte
-					fb = arr[fbi]&255;
-					fb = fb << offset;
-				}
-				if (sbi >= arr.length) sb = 0;
-				else {
-					sb = arr[sbi]&255;
-					sb = sb >>> (8-offset);
-				}
-				int b = (fb|sb)&mask; // ancienne valeur
-				int nb = fun.apply((byte)b);
-				if (fbi >= 0) {
-					arr[fbi] = (byte)((arr[fbi]&first_bits_mask(offset)) | (nb>>>offset));
-				}
-				if (sbi < arr.length) {
-					int m2 = last_bits_mask(8-((at+len)%8));
-					arr[sbi] = (byte)((arr[sbi]&m2) | ((nb<<(8-offset))&(~m2)&255));
-				}
-				if (fill) b |= imask;			
-				return new ApplyBitsRequest((byte)b, (byte)nb, (byte)(at%8), (byte)len, (byte)mask);
-			}
-			*/
 		}
 	}
 
@@ -2114,24 +1972,6 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		if( num == 0 ) return 0;
     	return 31 - Integer.numberOfLeadingZeros(num);
 	}
-	/*
-	private static int fast_log2(byte num) {
-		if( num == 0 ) return 0;
-    	return 31 - Integer.numberOfLeadingZeros(num&255);
-	}
-	private static long fast_log2_ceil(long num) {
-		if( num == 0 ) return 0;
-    	return 64 - Long.numberOfLeadingZeros(num - 1);
-	}
-	private static int fast_log2_ceil(int num) {
-		if( num == 0 ) return 0;
-    	return 32 - Integer.numberOfLeadingZeros(num - 1);
-	}
-	private static int fast_log2_ceil(byte num) {
-		if( num == 0 ) return 0;
-    	return 32 - Integer.numberOfLeadingZeros((num&255) - 1);
-	}
-	*/
 
 	/**
 	 * masque n'ayant que les n premier bit (fait pour être utiliser avec des byte donc n'utilise que les 8 derniers bits)

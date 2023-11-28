@@ -1,7 +1,5 @@
 import java.util.Optional;
 
-import javax.swing.text.html.Option;
-
 /**
  * Représentation d'une trame. Ne contient pas le flag parce que c'est toujours le même pis que l'emmetteur peut décider d'utiliser celui qu'il veut.
  * 

@@ -28,11 +28,11 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 
 	// Pourquoi est-ce que java hais les bytes ?
 	/**
-	 * 0. Parce que c'est plus facile que tapper (byte)0 à chaque fois.
+	 * 0 Parce que c'est plus facile que tapper (byte)0 à chaque fois.
 	 */
 	private static final byte ZERO = (byte)0;
 	/**
-	 * 1. Parce que c'est plus facile que tapper (byte)1 à chaque fois.
+	 * 1 Parce que c'est plus facile que tapper (byte)1 à chaque fois.
 	 */
 	@SuppressWarnings("unused")
 	private static final byte ONE = (byte)1;

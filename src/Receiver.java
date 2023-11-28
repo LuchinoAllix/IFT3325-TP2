@@ -26,7 +26,6 @@ public class Receiver{
 		try {
 			port = Integer.parseInt(args[0]);
 			start(port);
-			// Quelle condition pour stop le receiver ?
 			stop();
 		} catch (NumberFormatException e) {
 			System.out.println("Le numéro de port doit être un entier.");

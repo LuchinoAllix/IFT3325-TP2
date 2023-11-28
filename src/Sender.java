@@ -40,9 +40,9 @@ public class Sender{
 			
 			startConnection(machine,port,mode);
 			writer.print(input);
-			
-			// Quelle condition pour arrêter le sender ?
+			input.close();
 			stopConnection();
+
 		} catch (NumberFormatException e) {
 			System.out.println("Le numéro de port et la méthode doivent être des entiers.");
 			System.exit(0);

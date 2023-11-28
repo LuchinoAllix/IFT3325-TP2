@@ -35,7 +35,5 @@ public class Receiver{
 			e.printStackTrace();
 			System.exit(0);
 		}
-
-
 	}
 }

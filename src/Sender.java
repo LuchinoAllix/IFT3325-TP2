@@ -9,12 +9,13 @@ public class Sender{
 	private static IO io;
 	private static PrintStream writer;
 
-	public static void startConnection(String ip, int port) throws UnknownHostException, IOException {
+	public static void startConnection(String ip, int port, IO.Mode mode) throws UnknownHostException, IOException {
 		clientSocket = new Socket(ip, port);
 		in_stream = clientSocket.getInputStream();
 		out_stream = clientSocket.getOutputStream();
 		io = new IO(in_stream,out_stream);
 		writer = new PrintStream(io.getOutputStream());
+		io.ouvreConnexion(mode);
 	}
 
 
@@ -37,7 +38,7 @@ public class Sender{
 			File file = new File(args[2]);
 			FileInputStream input = new FileInputStream(file);
 			
-			startConnection(machine, port);
+			startConnection(machine,port,mode);
 			writer.print(input);
 			
 			// Quelle condition pour arrêter le sender ?
@@ -54,9 +55,6 @@ public class Sender{
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(0);
-		}
-
-		
+		}	
 	}
-
 }

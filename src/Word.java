@@ -199,7 +199,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	public boolean getBitAt(int i) {
-		if (i < this.length) throw new IndexOutOfBoundsException();
+		if (i < 0 || i >= this.length) throw new IndexOutOfBoundsException();
 		int oct = i >>> 3; // divisé par 8
 		byte offset = (byte)(i & 7); // garde les trois dernier chiffre;
 		boolean bit = (this.array[oct] & (128 >>> offset)) != 0; // on retourne le 'offset'ième bit du 'oct'ième octet
@@ -213,7 +213,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return la valeur précédente du bit
 	 */
 	public boolean setBitAt(int i, boolean value) {
-		if (i < this.length) throw new IndexOutOfBoundsException();
+		if (i < 0 || i >= this.length) throw new IndexOutOfBoundsException();
 		int oct = i >>> 3; // divisé par 8
 		byte mask = (byte)(128 >>> (i & 7)); // garde les trois dernier chiffre;
 		boolean old = (this.array[oct] & mask) != 0;

@@ -178,7 +178,7 @@ public class IO {
 			}
 			@Override
 			Trame update_in(IO self, Trame.I trame) {
-				int n = trame.getNum().get();
+				int n = trame.getNum();
 				// vérifier que la trame est dans la fenetre pertinente
 				if (IO.in(n, self.in_at, self.in_at+this.taille_fenetre)) {
 					// vérifier que c'est la trame attendu
@@ -256,7 +256,7 @@ public class IO {
 			}
 			@Override
 			Trame update_in(IO self, Trame.I trame) {
-				int n = trame.getNum().get()%8;
+				int n = trame.getNum()%8;
 				// vérifier que la trame est dans la fenetre pertinente
 				if (IO.in(n, self.in_at, self.in_at+this.taille_fenetre)) {
 					// vérifier que c'est la trame attendu
@@ -388,7 +388,7 @@ public class IO {
 	/**
 	 * Délais, en millisecondes, avant que le temporisateur effectue une action
 	 */
-	private static final long DELAIS_TEMPORISATEUR = 3000;
+	private static final long DELAIS_TEMPORISATEUR = 20000;
 	
 	/**
 	 * État de la connexion
@@ -597,7 +597,7 @@ public class IO {
 				synchronized (this.out_ctrl_queue) {
 					while (!this.out_ctrl_queue.isEmpty()) {
 						Trame trame = this.out_ctrl_queue.poll();
-						send_trame(trame);
+						TrameSender.sendTrame(out_stream, trame);
 					}
 				}
 				
@@ -611,7 +611,7 @@ public class IO {
 								t = this.out_buffer[this.out_at] = next.orElse(null);
 								if (t == null) break; // si t est encore null, on a plus rien a envoyer alors on quitte la boucle
 							}
-							send_trame(t);
+							TrameSender.sendTrame(out_stream, t);
 							this.out_at += 1;
 						}
 					}
@@ -648,11 +648,11 @@ public class IO {
 	 * Reçoit les trames, s'assure de leur intégrité puis les dispatch pour leur traitement
 	 */
 	private void receive() {
-		try {
+		//try {
 			do  {
 				if (this.kill) break;
 				try {
-					Optional<Trame> t = read_next_trame();
+					Optional<Trame> t = TrameReceiver.receiveTrame(this.in_stream);
 					if (!t.isPresent()) { // stream fermé, on quitte
 						this.status = Status.CLOSED;
 					} else {
@@ -663,11 +663,11 @@ public class IO {
 					// ignore la trame
 				}
 			} while (this.status == Status.CLOSED);
-		} catch (IOException e) {
+		//} catch (IOException e) {
 			// erreur avec le socket, on ferme
-			this.status = Status.CLOSED;
-			System.err.println(e);
-		} finally {
+			//this.status = Status.CLOSED;
+			//System.err.println(e);
+		//} finally {
 			// ferme le in_stream
 			this.logln("Ferme les stream entrant");
 			try {
@@ -686,7 +686,7 @@ public class IO {
 				this.in_buffer = null;
 			}
 			this.close_all();
-		}
+		//}
 	}
 	/** gère la réception des trames de type inconnu
 	 * Ne devrait pas être appelé
@@ -716,7 +716,7 @@ public class IO {
 			this.logln("\tactive la connexion");
 		}
 		
-		int n = t.getNum().get();
+		int n = t.getNum();
 		// on assume qu'on ne recoit pas d'ack pour une trame pas envoyer
 		// 1. avancer la fenêtre
 		// tite optimisation: si on n'a pas a déplacer la fenêtre, on fait juste quitter
@@ -814,7 +814,7 @@ public class IO {
 	@SuppressWarnings("unused")
 	private boolean receive(Trame.R t) throws Trame.TrameException {
 		if (this.status == Status.CONNECTED) {
-			int n = t.getNum().get();
+			int n = t.getNum();
 			Mode m = t.selectif()? Mode.SELECT : Mode.GBN;
 			if (this.mode == null || !this.mode.supporte(m)) throw new Trame.TrameException("Mode de rejet invalide");
 			m.update_out(n, this);
@@ -823,97 +823,7 @@ public class IO {
 		}
 		return false;
 	}
-	/**
-	 * Lit la prochaine trame du stream entrant
-	 * @return la trame, ou empty si la connexion est fermé
-	 */
-	private Optional<Trame> read_next_trame() throws IOException, Trame.TrameException {
-		// assume qu'on est connecté
-		
-		int nb_of_ones = 0;
-		// cherche le flag de début de trame
-		while (true) { // on va sortir manuellement
-			Optional<Boolean> bit = read_next_bit();
-			if (bit.isEmpty()) { // fin du stream, on renvoi rien
-				return Optional.empty();
-			} else {
-				boolean b = bit.get();
-				if (b) nb_of_ones += 1;
-				else {
-					if (nb_of_ones == 6) { // flag, on commence à lire
-						nb_of_ones = 0;
-						break;
-					} else {
-						nb_of_ones = 0;
-					}
-				}
-			}
-		}
-
-		// lit la trame jusqu'à ce qu'on trouve le flag de fin
-		ArrayList<Byte> bytes = new ArrayList<>();
-		int curr_byte = 0;
-		int curr_bit_index = 0;
-		int len = 0;
-		Optional<Boolean> curr_bit;
-		while (true) {
-			curr_bit = read_next_bit();
-			if (curr_bit.isEmpty()) {
-				// ceci est une erreur, le stream a pris fin, mais on n'a pas recu toute la trame
-				throw new IOException();
-			}
-			boolean b = curr_bit.get();
-			if (nb_of_ones == 5 && !b) { // 0 de bit stuffing, on ignore
-				nb_of_ones = 0;
-				continue;
-			} else if (nb_of_ones == 5) { // 6e 1, donc flag de fin ou erreur
-				curr_bit = read_next_bit();
-				if (curr_bit.isPresent() && !curr_bit.get()) { // flag de fin
-					// on avait lu 6 bits de ce flag précédement, alors on veut les enlever du mot
-					if (curr_bit_index == 6) { // on lisait le 7e bit, donc on n'a qu'à ignorer ce byte
-						break;
-					} else if (curr_bit_index > 6) { // il y a des bits que l'on veut conserver
-						int bits_a_conserver = curr_bit_index - 6;
-						int mask = (-256) >> bits_a_conserver;
-						curr_byte = curr_byte&mask&255;
-						bytes.add((byte)curr_byte);
-						len += bits_a_conserver;
-						break;
-					} else { // des bits déjà dans le tableau faisaient partie du flag et il faut les enlever
-						int bits_a_enlever = 6-curr_bit_index;
-						// plus simple, car on a qu'a changer la longueur, les bits à la fin vont simplement être ignoré
-						len -= bits_a_enlever;
-					}
-				} else { // 7e 1, donc erreur
-					throw new Trame.TrameException();
-				}
-			} else { // on ajoute le bit
-				if (b) curr_byte |= 128 >>> curr_bit_index; // flip le bit 
-				curr_bit_index += 1;
-				if (curr_bit_index == 8) { // byte compléter, on l'ajoute au tableau
-					bytes.add((byte)curr_byte);
-					curr_byte = 0;
-					curr_bit_index = 0;
-					len += 8;
-				}
-			}
-		}
-		byte[] arr = new byte[bytes.size()];
-		for (int i=0; i<arr.length; i+=1) // parce que java...
-			arr[i] = bytes.get(i);
-		return Optional.of(Trame.decode(new Word(arr, len), CRC.CRC_CCITT));
-	}
-	/**
-	 * Lit le prochain bit à l'entrée
-	 * @return
-	 * @throws IOException
-	 */
-	private Optional<Boolean> read_next_bit() throws IOException{
-		if (this.status == Status.CLOSED || this.kill) return Optional.empty();
-		int b = this.in_stream.read();
-		if (b < 0) return Optional.empty();
-		return Optional.of(b != 0);
-	}
+	
 	/**
 	 * ferme tout et lâche les ressources. Bloque le thread jusqu'à temps que tout soit fermé
 	 * @return true lorsque tout est fermé
@@ -936,21 +846,7 @@ public class IO {
 		}
 		return true;
 	}
-	/**
-	 * Envoie la trame sur le stream sortant
-	 * @param trame trame à envoyer
-	 * @throws IOException
-	 */
-	private void send_trame(Trame trame) throws IOException {
-		if (this.status == Status.CLOSED || this.kill) return;
-		this.logln(">> " + trame);
-		Word bits = trame.encode(CRC.CRC_CCITT);
-		send_wout_stuffing(FLAG);
-		send_w_stuffing(bits);
-		send_wout_stuffing(FLAG);
-		send_wout_stuffing(BIT_INV); // on envoie des bits invalide pour bien séparer les trames
-		out_stream.flush();
-	}
+	
 	/**
 	 * Créer la prochaine trame I en prenant jusqu'à 1024 bits du buffer d'écriture. 
 	 * @return la nouvelle trame I. Empty s'il n'y a rien a envoyer
@@ -969,46 +865,6 @@ public class IO {
 			}
 		}
 		return Optional.empty();
-	}
-	/**
-	 * Envoie des bits avec du bit stuffing
-	 * @param bits
-	 * @throws IOException
-	 */
-	private void send_w_stuffing(Word bits) throws IOException {
-		int at = 0;
-		int number_of_one = 0;
-		while (at < bits.length) {
-			boolean b = bits.getBitAt(at);
-			out_stream.write(write_bit(b));
-			if (b) {
-				number_of_one += 1;
-				if (number_of_one == 5) {
-					out_stream.write(write_bit(false));
-					number_of_one = 0;
-				}
-			}
-			at += 1;
-		}
-	}
-	/**
-	 * envoie des bits sans bit stuffing
-	 * @param bits
-	 * @throws IOException
-	 */
-	private void send_wout_stuffing(Word bits) throws IOException {
-		int at = 0;
-		while (at < bits.length) {
-			boolean b = bits.getBitAt(at);
-			out_stream.write(write_bit(b));
-			at += 1;
-		}
-	}
-	private int write_bit(boolean desire) {
-		//if (!this.skip_erreur && Math.random() <= this.chance_bit_errone) {
-		//	desire = Math.random() <= 0.5? false : true;
-		//}
-		return desire? 1 : 0;
 	}
 
 	/**
@@ -1149,7 +1005,7 @@ public class IO {
 		private IOInputStream(IO self) { this.self = self; }
 		@Override
 		public int read() throws IOException {
-			if (self.status == Status.NEW || self.status == Status.WAITING) throw new IOException("Connexion pas encore ouverte");
+			if (self.status == Status.NEW || self.status == Status.WAITING) throw new NoConnexionException("Connexion pas encore ouverte");
 			synchronized (self.read_lock) {
 				while (self.status == Status.CONNECTED) {
 					if (self.read_len == 0) try {self.read_lock.wait();} catch (InterruptedException e) {}
@@ -1180,7 +1036,8 @@ public class IO {
 		private IOOutputStream(IO self) { this.self = self; }
 		@Override
 		public void write(int b) throws IOException {
-			if (self.status == Status.NEW || self.status == Status.WAITING) throw new IOException("Connexion pas encore ouverte");
+			RuntimeException e = null;
+			if (self.status == Status.NEW || self.status == Status.WAITING) e = new NoConnexionException("Connexion pas encore ouverte");
 			if (self.status == Status.CLOSED) throw new IOException("Connexion fermée");
 			synchronized (self.write_lock) {
 				// réarranger le buffer
@@ -1198,6 +1055,7 @@ public class IO {
 
 				self.write_lock.notifyAll();
 			}
+			if (e != null) throw e;
 		}
 		@Override
 		public void close() {
@@ -1212,7 +1070,7 @@ public class IO {
 		private IO self;
 		private InputThread(IO self) { 
 			this.self = self; 
-			this.setDaemon(true);
+			//this.setDaemon(true);
 		}
 		@Override
 		public void run() {
@@ -1231,7 +1089,7 @@ public class IO {
 		private IO self;
 		private OutputThread(IO self) { 
 			this.self = self; 
-			this.setDaemon(true);
+			//this.setDaemon(true);
 		}
 		@Override
 		public void run() {
@@ -1284,5 +1142,12 @@ public class IO {
 		@Override
 		public void run() { this.src.run(); }
 		
+	}
+
+	public static class NoConnexionException extends RuntimeException {
+		public NoConnexionException(String msg) {super(msg);}
+		public NoConnexionException(Throwable src) {super(src);}
+		public NoConnexionException(String msg, Throwable src) {super(msg, src);}
+		public NoConnexionException() {super();}
 	}
 }

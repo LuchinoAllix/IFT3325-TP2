@@ -139,7 +139,7 @@ public class CRC {
             align = msg.firstOne(align.get());
         }
         // retourne les len derniers bits
-        Word code = msg.subWord(msg.length, msg.length);
+        Word code = msg.subWord(msg.length-(gen.length-1), msg.length);
         return code.countOne() == 0;
     }
 }

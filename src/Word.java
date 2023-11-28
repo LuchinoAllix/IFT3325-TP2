@@ -54,7 +54,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param b
 	 */
 	public Word(byte b) {
-		System.out.println("byte formula");
+		//System.out.println("byte formula");
 		this.array = new byte[]{b};
 		this.length = 8;
 	}
@@ -137,6 +137,16 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	public Word(byte[] arr, int len) {
 		this.array = arr;
 		this.length = len;
+	}
+	/**
+	 * Créer une chaîne de bit à partir d'un tableau de bool
+	 * @param arr tableau de bool; chaque boolean représente 1 bit
+	 */
+	public Word(boolean[] arr) {
+		this.length = arr.length;
+		this.array = new byte[nb_byte_for_n_bit(this.length)];
+		for (int i=0; i<arr.length; i+=1)
+			setBitAt(i, arr[i]);
 	}
 
 	/**
@@ -608,7 +618,9 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @return
 	 */
 	private static byte[] sub_word(byte[] src, int start, int end) {
-		if (start >= src.length*8 || start < 0 || end > src.length*8)  throw new IndexOutOfBoundsException();
+		if (start >= src.length*8) throw new IndexOutOfBoundsException("start trop grand (" + start + "/" + src.length*8 + ")");
+		if (start < 0) throw new IndexOutOfBoundsException("start trop petit");
+		if (end > src.length*8) throw new IndexOutOfBoundsException("end trop grand (" + start + "/" + src.length*8 + ")");
 		// trois cas: start==end (trivial), start est un multiple de 8 (facile) et start n'est pas un multiple de 8 (difficile)
 		int so = start%8;
 		if (start == end) {

@@ -7,6 +7,8 @@ import java.util.Optional;
  */
 public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, Trame.F, Trame.P {
 
+	public static final Word FLAG = new Word("01111110");
+
 	/**
 	 * Retourne le type de cette trame
 	 * @return le type de la trame
@@ -16,7 +18,7 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 	 * Retourne le numéro de cette trame (ou rien si la trame n'a pas de numéro pour une quelqu'onque raison)
 	 * @return le numéro de la trame
 	 */
-	public Optional<Integer> getNum() {return Optional.empty();}
+	public int getNum() {return 0;}
 	/**
 	 * Retourne les données, si présente, transportées par cette trames
 	 * @return les données de la trame
@@ -26,7 +28,7 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 	 * calcule le byte à utliser lors de l'encodage de cette trame. je ne sais pas pourquoi elle est publique...
 	 * @return encodage du numéro de la trame
 	 */
-	public byte getNumByte() { return 0; }
+	public byte getNumByte() { return (byte)Character.forDigit(this.getNum(), 10); }
 
 	/**
 	 * Indique ce qui doit être indiquer dans la section 'type' de la repr String d'une trame. Ne peut pas être null
@@ -37,7 +39,7 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 	 * Indique ce qui doit être indiquer dans la section 'num' de la repr String d'une trame. Peut être null
 	 * @return
 	 */
-	String print_num() { return this.getNum().map(n -> n.toString()).orElse(null); }
+	String print_num() { return String.valueOf(this.getNum()); }
 	/**
 	 * Indique ce qui doit être indiquer dans la section 'msg' de la repr String d'une trame. Peut être null
 	 * @return
@@ -73,12 +75,12 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 			this.msg = msg;
 		}
 		@Override
-		public Optional<Integer> getNum() { return Optional.of(this.num); }
+		public int getNum() { return this.num; }
 		@Override
 		public Optional<Word> getMsg() { return Optional.of(msg); }
 		@Override
 		public byte getNumByte() {
-			return (byte)Character.forDigit(this.getNum().orElse(0), 10);
+			return (byte)Character.forDigit(this.num, 10);
 		}
 	}
 	/**
@@ -92,7 +94,7 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 		@Override
 		public Trame.Type getType() { return Trame.Type.C; }
 		@Override
-		public Optional<Integer> getNum() { return Optional.of(this.num); }
+		public int getNum() { return this.num; }
 		/**
 		 * Indique si la demande de connexion est avec le protocole Go-Back-N
 		 * @return true si on a demandé Go-Back-N, false si c'est l'autre
@@ -121,7 +123,7 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 		@Override
 		public Trame.Type getType() { return Trame.Type.A; }
 		@Override
-		public Optional<Integer> getNum() { return Optional.of(this.num&127); }
+		public int getNum() { return this.num&127; }
 		/**
 		 * Indique si l'autre point est prêt à recevoir plus de trame I
 		 * @return true si on peut envoyer plus de trame I, sinon false
@@ -151,12 +153,12 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 		@Override
 		public Trame.Type getType() { return Trame.Type.R; }
 		@Override
-		public Optional<Integer> getNum() { return Optional.of(this.num&127); }
+		public int getNum() { return this.num&127; }
 		/**
 		 * Indique si la trame demande un rejet sélectif
 		 * @return true si on ne doit renvoyer que la trame n, false si on doit renvoyer celles suivantes également
 		 */
-		public boolean selectif() { return (num&128) == 0;}
+		public boolean selectif() { return (num&128) != 0;}
 		@Override
 		public byte getNumByte() {
 			if ((this.num&128) == 0) return (byte)Character.forDigit(this.num, 10);
@@ -232,7 +234,7 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 		if (bits.length < min_nb_of_bits) throw new TrameException("Trame trop petite"); 
 		// vérification du crc
 		boolean check = gen.isValid(bits);
-		if (check) throw new TrameException("crc incorecte");
+		if (!check) throw new TrameException("crc incorecte");
 
 		int crc_start = bits.length - gen_len;
 		try {
@@ -260,7 +262,7 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 	 * @return chaîne de bits représentant la trame, prêt à être envoyer
 	 */
 	public Word encode(CRC gen) {
-		Word type = new Word(this.getType().indexOf());
+		Word type = new Word((byte)this.getType().indexOf());
 		Word num = new Word(this.getNumByte()); // char est 16-bits, les chiffres sont dans ASCII donc 8 bits. puisque java utilise les codepoint unicode, un simple cast de la sorte sufit
 		Word sous = switch (this.getType()) {
 			case I -> Word.concat(type, num, this.getMsg().get());

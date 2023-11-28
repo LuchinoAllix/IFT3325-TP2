@@ -50,7 +50,7 @@ public class Sender{
 			System.out.println("Fichier mentionné non trouvé.");
 			System.exit(0);
 		} catch (UnknownHostException e) {
-			e.printStackTrace();
+			System.out.println("L'adresse IP n'est pas valide.");
 			System.exit(0);
 		} catch (IOException e) {
 			e.printStackTrace();

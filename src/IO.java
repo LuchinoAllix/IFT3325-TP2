@@ -12,7 +12,119 @@ import java.util.TimerTask;
 /**
  * Classe gérant l'échange de trame d'un point à l'autre
  * Tu lui fournit deux stream pour les bits sortant et entrant et elle va s'occuper d'attendre les trames et de récupérer les msg.
- * Ne ferme pas les streams originaux à la fin alors tu dois t'en occuper toi même
+ * Ne ferme pas les streams originaux à la fin alors tu dois t'en occuper toi même.
+ * 
+ * À l'interne, utilise deux thread pour la lecture et l'écriture des signaux entrant/sortant. 
+ * Les opérations sont synchronisées pour éviter que les threads se pile sur les pieds. 
+ * L’envoi et la réception se fait bit par bit.
+ * 
+ * Un InputStream et OutputStream sont mis à la disposition de l'utilisateur pour écrire/lire des bytes sans se soucier des trames.
+ * 
+ * <h3>Envoi de trame</h3>
+ * <p>
+ * À chaque itération, le thread responsable d'écrire les trames a trois étapes:
+ * </p>
+ * <ol>
+ * 	<li>Si on avait précedemment envoyer un RNR, mais que l'on peut maintenant recevoir plus de données, rajouter un RR à la queue de contrôle</li>
+ * <li>Envoyer toutes les trames de contrôles dans la queue</li>
+ * <li>Envoyer le plus de trame I possible</li>
+ * </ol>
+ * <p>
+ * Pour créer la prochaine trame I, la méthode <code>mkNextTrame()</code> est appelé. Celle-ci prend jusqu'à 1024 bytes du buffer d'écriture comme message de trame. S'il n'y a plus de byte à envoyer, elle retourne rien et on passe à la prochaine itération.
+ * </p>
+ * <p>
+ * L'envoi d'une trame se déroule comme suit:
+ * </p>
+ * <ol>
+ * <li>La trame est encodé avec <code>CRC_CCITT</code> et transformé en chaîne de bits</li>
+ * <li>n envoi (sans bit stuffing) le flag de début de trame</li>
+ * <li>on envoi (avec bit stuffing) la chaîne</li>
+ * <li>on envoi (sans bit stuffing) le flag de fin de trame</li>
+ * <li>on envoi <code>11111111</code> pour bien délimiter --- Ça permet de ne pas inventer une trame s'il y avait une erreur dans la précédentes et qu'on avait abandonner la lecture</li>
+ * </ol>
+ * 
+ * <h3>Réception de trame</h3>
+ * <p>
+ * La recherche de la prochaine trame reçu se déroule de la manière suivante:
+ * </p>
+ * <ol>
+ * <li>On lit les bits reçu jusqu'à ce que l'on trouve le flag de début de trame</li>
+ * <li>On récolte les bits de la trame un par un jusqu'à ce qu'on arrive au flag de fin de trame. On enlève les 0 de bit stuffing, et si l'on trouve sept 1 d'affiler, on lance une erreur et on rejette la trame (ça va simplement nous faire passer à la prochaine itération)</li>
+ * <li>on décode les bits reçu. la vérification du FCD se fait en même temps et s'il y a une erreur on rejette la trame</li>
+ * <li>la trame est traité selon son type, le mode de connexion et le status</li>
+ * </ol>
+ * 
+ * <h3>Traitement d'une trame</h3>
+ * <p>
+ * Toute les trames sont ignorées si la connexion est fermé. 
+ * Si le status est à NEW, toute les trames sont ignorées sauf les trames C. 
+ * En status WAITING, tout est ignoré sauf les trames F et R.
+ * </p>
+ * <p>
+ * Autrement, la trame est traité selon le son type et le mode.
+ * </p>
+ * <h4>A (RR et RNR)</h4>
+ * <p>Lorsque l'on reçoit une trame A, les choses suivantes se passent:</p>
+ * <ol>
+ * <li>Si le status est WAITING, passer à CONNECTED</li>
+ * <li>avancer la fenêtre d'envoi selon le numéro</li>
+ * <li>indiquer que l'on peut envoyer d'autre trame ou non selon si c'est un RR ou RNR</li>
+ * </ol>
+ * <h4>C</h4>
+ * <p>
+ * On ignore ces trames sauf si on est en status NEW. Dans ce cas, on envoi un RR et un P initial en réponse.
+ * </p>
+ * <h4>F</h4>
+ * <p>
+ * lors de la réception d'un F, on ferme les streams et on arrête de lire/envoyer. Le status passe à CLOSED
+ * </p>
+ * <h4>P</h4>
+ * <p>
+ * À la réception d'un P, on ne fait qu'en envoyer un à notre tour
+ * </p>
+ * <h4>R (REJ et SREJ)</h4>
+ * <p>
+ * Lors de la réception d'un R, on passe la logique à notre mode. 
+ * Dans le cas de GBN, on ne fait que déplacer la fenêtre d'envoi pour l'aligner avec la trame désirée afin de signaler que c'est la prochaine à envoyer.
+ * </p>
+ * <h4>I</h4>
+ * <p>
+ * Encore une fois, on passe la logique à notre mode. Dans le cas de GBN, on vérifie que le numéro de la trame est:
+ * </p>
+ * <ol>
+ * <li>Dans la fenêtre de réception (Si elle ne l'est pas, on l'ignore)</li>
+ * <li>La trame désirée</li>
+ * </ol>
+ * <p>
+ * S'il s'agit de la bonne trame, on ajoute les données contenues à notre buffer de lecture, on avance la fenêtre de réception et on envoi un RR (ou un RNR si notre buffer est plein),
+ * sinon, on envoi un REJ
+ * </p>
+ * 
+ * <h3>Interface</h3>
+ * <p>
+ * Après la création de l'objet, il faut que l'un utilise la méthode <code>ouvreConnexion()</code> pour établir la connexion avec l'autre.
+ * </p>
+ * <p>
+ * Une fois établi, l'objet donne accès à un <code>OutputStream</code> pour envoyer des données. 
+ * Tout les bytes que ce stream reçoit sont ajouter à un buffer d'écriture et ils seront utilisés pour créer les trames I. 
+ * De l'autre côté, il suffit de prendre l'<code>InputStream</code> que fourni l'objet afin d'y lire les bytes dans son buffer de lecture.
+ * </p>
+ * <p>
+ * À la fin, il est important d'appeler la méthode <code>fermeConnexion</code> afin d'arrêter les threads et de libérer les ressources. 
+ * IO ne ferme pas les streams qui lui sont donné au début. 
+ * Il faudra donc les fermer vous même.
+ * </p>
+ * 
+ * <h3>Temporisateur</h3>
+ * <p>
+ * IO possède également un troisème thread sous la forme d'un \verb#Timer# qui agit comme temporisateur. 
+ * Trois différents renvoi sont gérer par le temporisateur présentement:
+ * </p>
+ * <ul>
+ * <li>Le renvoi des P si tu es le serveur et que tu n'a pas reçu le P depuis un bon moment. Reset à chaque P reçu</li>
+ * <li>Le renvoi de RR si tu attend des trames mais que tu n'en a pas reçu depuis un moment. Reset à chaque RR, REJ ou SREJ envoyé. Arrêté lors de l'envoi d'un RNR</li>
+ * <li>Le renvoi des trames I à partir du début de la fenêtre si aucune réponse n'a été reçu. Reset à l'envoi d'un I, arrêter à la réception d'un RR, RNR, REJ et SREJ</li>
+ * </ul>
  */
 public class IO {
 	/**
@@ -47,6 +159,7 @@ public class IO {
 		 */
 		GBN(7) {
 			//Trame mk_rejet(int n) { return Trame.rej(n); }
+			@Override
 			void update_out(int n, IO self) {
 				n = n%8;
 				synchronized (self.out_lock) {
@@ -56,12 +169,14 @@ public class IO {
 					self.out_at = n;
 				}
 			}
+			@Override
 			public boolean supporte(Mode m) {
 				return switch (m) {
 					case GBN -> true;
 					default -> false;
 				};
 			}
+			@Override
 			Trame update_in(IO self, Trame.I trame) {
 				int n = trame.getNum().get();
 				// vérifier que la trame est dans la fenetre pertinente
@@ -240,50 +355,159 @@ public class IO {
 		 */
 		abstract Trame.C open();
 	}
-	private static final int MAX_BYTES_IN_BUFFER = 4096; // le nombre maximal de bytes qu'on met dans le buffer avant d'envoyer un RNR
+	/**
+	 * le nombre maximal de bytes qu'on met dans le buffer avant d'envoyer un RNR
+	 */
+	private static final int MAX_BYTES_IN_BUFFER = 4096;
+	/**
+	 * Nombre maximal de byte que l'on envoi en msg dans une trame
+	 */
 	private static final int MAX_I_TRAME_SIZE = 1024;
+	/**
+	 * un mot invalide qui va causer une erreur si lu
+	 */
 	private static final Word BIT_INV = new Word("11111111");
+	/**
+	 * Flag de début et fin de trame
+	 */
 	private static final Word FLAG = new Word("01111110");
+	/**
+	 * Délais, en millisecondes, avant que le temporisateur effectue une action
+	 */
 	private static final long DELAIS_TEMPORISATEUR = 3000;
 	
+	/**
+	 * État de la connexion
+	 */
 	private Status status = Status.NEW;
+	/**
+	 * Mode pour le rejet de trame
+	 */
 	private Mode mode = null;
-	private boolean kill = false; // si vrai, on arrête tout même s'il nous restait des choses à envoyer
-	private boolean can_send = true; // vrai lorsque le récepteur peut recevoir plus de trame I
-	private Logger logger = null; // pour si on veut des traces
-	
-	private Object read_lock = new Lock(); // un objet quelqu'onque pour verouiller le buffer de lecture
-	private byte[] read_buffer = new byte[0]; // tableau contenant les bytes qui peuvent être lu de ce IO
-	private int read_at = 0; // byte auquel on est rendu
-	private int read_len = 0; // nb de bytes qu'il nous reste à lire
-	private IOInputStream read_stream; // pour lires les bytes reçu dans les trames
-
-	private Object write_lock = new Lock(); // verou pour l'écriture
-	private byte[] write_buffer = new byte[0]; // buffer de byte à envoyer
-	private int write_at = 0; //  prochain byte à écrire
-	private int write_len = 0; // nombre de byte restant à écrire
-	private IOOutputStream write_stream; // pour rajouter des bytes à envoyer dans les trames
-
-	private InputStream in_stream; // pour lire les trames entrantes
-	private int in_at = 0; // trame attendu
-	private Trame.I[] in_buffer = new Trame.I[8]; // buffer de trames entrantes; pour selective reject
-	private Object in_lock = new Lock();
-	private Thread in_thread;
+	/**
+	 * si vrai, on arrête tout même s'il nous restait des choses à envoyer
+	 */
+	private boolean kill = false;
+	/**
+	 * vrai lorsque l'autre noeud peut recevoir plus de trame I
+	 */
+	private boolean can_send = true;
+	/**
+	 * vrai lorsque ce noeud peut recevoir plus de trame I
+	 */
 	private boolean can_receive = true;
+	/**
+	 * pour si on veut des traces. permet d'imprimer de manière personnalisé
+	 */
+	private Logger logger = null; 
+	
+	/**
+	 * un objet quelqu'onque pour verouiller le buffer de lecture
+	 */
+	private Object read_lock = new Lock();
+	/**
+	 * tableau contenant les bytes qui peuvent être lu de ce IO
+	 */
+	private byte[] read_buffer = new byte[0];
+	/**
+	 * byte auquel on est rendu
+	 */
+	private int read_at = 0;
+	/**
+	 * nb de bytes qu'il nous reste à lire
+	 */
+	private int read_len = 0;
+	/**
+	 * pour lires les bytes reçu dans les trames
+	 */
+	private IOInputStream read_stream;
 
-	private OutputStream out_stream; // pour écrire les trames sortantes
+	/**
+	 * verou pour l'écriture
+	 */
+	private Object write_lock = new Lock(); 
+	/**
+	 * buffer de byte à envoyer
+	 */
+	private byte[] write_buffer = new byte[0];
+	/**
+	 * position du prochain byte à écrire
+	 */
+	private int write_at = 0;
+	/**
+	 * nombre de byte restant à écrire.
+	 */
+	private int write_len = 0;
+	/**
+	 * Stream fourni à l'utilisateur pour envoyer des bytes qui seront mis dans des trames
+	 */
+	private IOOutputStream write_stream;
+
+	/**
+	 * pour lire les trames entrantes
+	 */
+	private InputStream in_stream;
+	/**
+	 * trame attendu
+	 */
+	private int in_at = 0;
+	/**
+	 * buffer de trames entrantes; pour selective reject
+	 */
+	private Trame.I[] in_buffer = new Trame.I[8];
+	/**
+	 * verou pour la réception de trame
+	 */
+	private Object in_lock = new Lock();
+	/**
+	 * Thread de réception
+	 */
+	private Thread in_thread;
+
+	/**
+	 * Stream pour écrire les trames sortantes
+	 */
+	private OutputStream out_stream;
+	/**
+	 * Verou pour la sortie de trame
+	 */
 	private Object out_lock = new Lock();
-	private Trame[] out_buffer = new Trame[8]; // contient les trames sortantes qu'on envoie présentement
-	private int out_start = 0; // première trame de la fenêtre courante
-	private Integer out_at = 0; // prochaine trame I à envoyer; est un Integer au lieu de int pour pouvoir l'utiliser comme mutex
-	private Queue<Trame> out_ctrl_queue = new ArrayDeque<>(); // queue pour les trames de controle
+	/**
+	 * contient les trames sortantes qu'on envoie présentement
+	 */
+	private Trame[] out_buffer = new Trame[8];
+	/**
+	 * première trame de la fenêtre courante
+	 */
+	private int out_start = 0;
+	/**
+	 * prochaine trame I à envoyer
+	 */
+	private int out_at = 0;
+	/**
+	 * Queue pour les trames de contrôles à envoyer
+	 */
+	private Queue<Trame> out_ctrl_queue = new ArrayDeque<>();
+	/**
+	 * Thread de sortie
+	 */
 	private Thread out_thread;
-	private final float chance_bit_errone; // probabilité (0.0-1.0) qu'un bit envoyé soit à la place déterminé aléatoirement
-	private final boolean skip_erreur; // flag pour rapidement éviter les erreurs
+//	private final float chance_bit_errone; // probabilité (0.0-1.0) qu'un bit envoyé soit à la place déterminé aléatoirement
+//	private final boolean skip_erreur; // flag pour rapidement éviter les erreurs
 
+	/**
+	 * Indique si ce noeud agit comme client ou serveur. 
+	 * La différence est que c'est le serveur qui initie le ping-pong avec les trames P
+	 */
 	private Role role = null;
+	/**
+	 * Exécute différente tâche après un délais, notament le renvoi de trame pour lesquels on n'a pas eu de réponse
+	 */
 	private Temporisateur temporisateur = new Temporisateur();
-	private Marker temp_p = new Marker(this) {  // temporisateur pour l'envoi d'une trame P
+	/**
+	 * Marqueur de temporisateur pour l'envoi de trame P
+	 */
+	private Marker temp_p = new Marker(this) {
 		@Override
 		public void run() {
 			self.queue_ctrl(Trame.p());
@@ -291,7 +515,10 @@ public class IO {
 			self.logln("N'a pas reçu P de puis un moment, renvoi");
 		}
 	};
-	private Marker temp_send = new Marker(this) { // temporisateur pour l'envoi des trames I si on ne reçoit pas de ack
+	/**
+	 * Marqueur de temporisateur pour le renvoi des trames I si on ne reçoit pas de ACK après un moment
+	 */
+	private Marker temp_send = new Marker(this) {
 		@Override
 		public void run() {
 			synchronized (self.out_lock) {
@@ -300,6 +527,9 @@ public class IO {
 			self.logln("N'a pas reçu de ACK de puis un moment, renvoi les trames I");
 		}
 	};
+	/**
+	 * Marqueur de temporisateur pour le renvoi d'un RR si on attend des trames mais que nous n'en avons pas reçu depuis un moment
+	 */
 	private Marker temp_ack = new Marker(this) { // temporisateur pour l'envoi des acks
 		@Override
 		public void run() {
@@ -310,11 +540,16 @@ public class IO {
 		}
 	};
 
-	public IO(InputStream input, OutputStream output, float chance_bit_errone) {
-		if (chance_bit_errone < 0) chance_bit_errone = 0;
-		else if (chance_bit_errone > 1) chance_bit_errone = 1;
-		this.chance_bit_errone = chance_bit_errone;
-		this.skip_erreur = this.chance_bit_errone == 0;
+	/**
+	 * Créer un noeud IO
+	 * @param input InputStream sur lequel ce noeud lit les bits entrant
+	 * @param output OutputStream sur lequel ce noeud écrit les bits sortant
+	 */
+	public IO(InputStream input, OutputStream output) {
+//		if (chance_bit_errone < 0) chance_bit_errone = 0;
+//		else if (chance_bit_errone > 1) chance_bit_errone = 1;
+//		this.chance_bit_errone = chance_bit_errone;
+//		this.skip_erreur = this.chance_bit_errone == 0;
 		this.out_stream = output;
 		this.in_stream = input;
 		this.in_thread = new InputThread(this);
@@ -322,13 +557,16 @@ public class IO {
 		this.in_thread.start();
 		this.out_thread.start();
 	}
-	public IO(InputStream input, OutputStream output) { this(input, output, 0); }
+//	public IO(InputStream input, OutputStream output) { this(input, output, 0); }
 
 	/**
-	 * fonction s'occupant de l'envoie de toutes les trames
+	 * fonction s'occupant de l'envoie de toutes les trames.
+	 * 
+	 * Boucle tant que la connexion existe.
+	 * À chaque itération, envoi toutes les trames de contrôle dans la queue et le plus de trame I possible
+	 * Créer de nouvelle trame I au besoins à partir du buffer d'écriture
 	*/ 
 	private void send() {
-		// même si on ferme la connection, on veut être certain que l'on a envoyé tout
 		try {
 			do {
 				if (this.kill) break;
@@ -392,6 +630,8 @@ public class IO {
 	
 	/**
 	 * Boucle s'occupant de recevoir toutes les trames entrantes
+	 * 
+	 * Reçoit les trames, s'assure de leur intégrité puis les dispatch pour leur traitement
 	 */
 	private void receive() {
 		try {
@@ -437,6 +677,7 @@ public class IO {
 	/** gère la réception des trames de type inconnu
 	 * Ne devrait pas être appelé
 	*/
+	@SuppressWarnings("unused")
 	private boolean receive(Trame t) throws Trame.TrameException {
 		// on ignore
 		this.logln("\tignore");
@@ -448,7 +689,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException
 	 */
-	private boolean receive(Trame.A t) throws Trame.TrameException {
+	@SuppressWarnings("unused")
+	 private boolean receive(Trame.A t) throws Trame.TrameException {
 		if (this.status == Status.NEW || this.status == Status.CLOSED) { // ignore
 			this.logln("\tignore (aucune connexion)");
 			return false; 
@@ -479,7 +721,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException
 	 */
-	private boolean receive(Trame.C t) throws Trame.TrameException {
+	@SuppressWarnings("unused")
+	 private boolean receive(Trame.C t) throws Trame.TrameException {
 		// si on est pas en attente de connexion, on ignore
 		if (this.status == Status.NEW) {
 			// on active la connexion et on envoi un P et un RR en confirmation
@@ -502,7 +745,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException
 	 */
-	private boolean receive(Trame.F t) throws Trame.TrameException {
+	@SuppressWarnings("unused")
+	 private boolean receive(Trame.F t) throws Trame.TrameException {
 		if (this.status == Status.CONNECTED || this.status == Status.WAITING){
 			close_all();
 			return true;
@@ -516,7 +760,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException si la trame contient une erreur
 	 */
-	private boolean receive(Trame.I t) throws Trame.TrameException {
+	@SuppressWarnings("unused")
+	 private boolean receive(Trame.I t) throws Trame.TrameException {
 		if (this.can_receive && this.status == Status.CONNECTED && this.mode != null) { // si on n'a pas encore de connexion, on ignore les trames I
 			// on délègue la logique au mode
 			Trame ret = this.mode.update_in(this, t);
@@ -533,7 +778,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException
 	 */
-	private boolean receive(Trame.P t) throws Trame.TrameException {
+	@SuppressWarnings("unused")
+	 private boolean receive(Trame.P t) throws Trame.TrameException {
 		// on fait juste le renvoyer si on est connecté
 		if (this.status == Status.CONNECTED){
 			queue_ctrl(Trame.p());
@@ -551,6 +797,7 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException si le mode de rejet demander est invalide
 	 */
+	@SuppressWarnings("unused")
 	private boolean receive(Trame.R t) throws Trame.TrameException {
 		if (this.status == Status.CONNECTED) {
 			int n = t.getNum().get();
@@ -690,6 +937,10 @@ public class IO {
 		send_wout_stuffing(BIT_INV); // on envoie des bits invalide pour bien séparer les trames
 		out_stream.flush();
 	}
+	/**
+	 * Créer la prochaine trame I en prenant jusqu'à 1024 bits du buffer d'écriture. 
+	 * @return la nouvelle trame I. Empty s'il n'y a rien a envoyer
+	 */
 	private Optional<Trame> mk_prochaine_trame() {
 		while (this.status == Status.CONNECTED) synchronized (this.write_lock) {
 			if (this.write_len > 0) { // on a des bytes a envoyer !!!
@@ -740,14 +991,14 @@ public class IO {
 		}
 	}
 	private int write_bit(boolean desire) {
-		if (!this.skip_erreur && Math.random() <= this.chance_bit_errone) {
-			desire = Math.random() <= 0.5? false : true;
-		}
+		//if (!this.skip_erreur && Math.random() <= this.chance_bit_errone) {
+		//	desire = Math.random() <= 0.5? false : true;
+		//}
 		return desire? 1 : 0;
 	}
 
 	/**
-	 * Ajoute un trame de ctrl
+	 * Ajoute un trame de ctrl à la queue
 	 * @param t
 	 */
 	private void queue_ctrl(Trame t) {
@@ -815,12 +1066,24 @@ public class IO {
 		close_all();
 		return true;
 	}
+	/**
+	 * Indique si ce noeud est présentement connecté.
+	 * @return
+	 */
 	public boolean estConnecte() {
 		return this.status == Status.CONNECTED;
 	}
+	/**
+	 * Retourne l'état de la connexion de ce noeud
+	 * @return
+	 */
 	public Status geStatus() {
 		return this.status;
 	}
+	/**
+	 * Indique si la connexion de ce noeud est fermée
+	 * @return
+	 */
 	public boolean estFerme() {
 		return this.status == Status.CLOSED;
 	}
@@ -855,32 +1118,25 @@ public class IO {
 	public Logger setLogger(Logger logger) {
 		Logger old = this.logger;
 		this.logger = logger;
-		return logger;
+		return old;
 	}
-	private void log(char msg) { if (this.logger != null) this.logger.print(msg); }
-	private void log(char[] msg) { if (this.logger != null) this.logger.print(msg); }
-	private void log(double msg) { if (this.logger != null) this.logger.print(msg); }
-	private void log(float msg) { if (this.logger != null) this.logger.print(msg); }
-	private void log(int msg) { if (this.logger != null) this.logger.print(msg); }
-	private void log(long msg) { if (this.logger != null) this.logger.print(msg); }
-	private void log(Object msg) { if (this.logger != null) this.logger.print(msg); }
-	private void log(String msg) { if (this.logger != null) this.logger.print(msg); }
-	private void logln(char msg) { if (this.logger != null) this.logger.println(msg); }
-	private void logln(char[] msg) { if (this.logger != null) this.logger.println(msg); }
-	private void logln(double msg) { if (this.logger != null) this.logger.println(msg); }
-	private void logln(float msg) { if (this.logger != null) this.logger.println(msg); }
-	private void logln(int msg) { if (this.logger != null) this.logger.println(msg); }
-	private void logln(long msg) { if (this.logger != null) this.logger.println(msg); }
-	private void logln(Object msg) { if (this.logger != null) this.logger.println(msg); }
+	/**
+	 * Imprime sur le logger s'il existe
+	 * @param msg
+	 */
 	private void logln(String msg) { if (this.logger != null) this.logger.println(msg); }
 
+	/**
+	 * InputStream lisant les bits reçu dans les trames. Lorsque l'on reçoit des bytes, ils sont placés dans un buffer. Ce stream lit les bytes de ce buffer.
+	 * S'il n'y a pas de byte à lire, bloque le thread jusqu'à ce qu'il y en aille
+	 */
 	private static class IOInputStream extends InputStream {
 		private IO self;
 		private IOInputStream(IO self) { this.self = self; }
 		@Override
 		public int read() throws IOException {
 			if (self.status == Status.NEW || self.status == Status.WAITING) throw new IOException("Connexion pas encore ouverte");
-			synchronized (self.read_buffer) {
+			synchronized (self.read_lock) {
 				while (self.status == Status.CONNECTED) {
 					if (self.read_len == 0) try {self.read_lock.wait();} catch (InterruptedException e) {}
 					else {
@@ -902,6 +1158,9 @@ public class IO {
 			self.close_all();
 		}
 	}
+	/**
+	 * Output stream pour envoyer des bytes. Tout les bytes passés sont ajouter au buffer d'écriture afin que le thread de sortie puisse les utiliser pour créer des trames I.
+	 */
 	private static class IOOutputStream extends OutputStream {
 		private IO self;
 		private IOOutputStream(IO self) { this.self = self; }
@@ -932,6 +1191,9 @@ public class IO {
 		}
 	}
 
+	/**
+	 * Thread s'occupant de rouler <code>receive()</code>
+	 */
 	private static class InputThread extends Thread {
 		private IO self;
 		private InputThread(IO self) { 
@@ -948,6 +1210,9 @@ public class IO {
 			self.close_all();
 		}
 	}
+	/**
+	 * Thread s'occupant de rouler <code>send</code>
+	 */
 	private static class OutputThread extends Thread {
 		private IO self;
 		private OutputThread(IO self) { 
@@ -965,7 +1230,14 @@ public class IO {
 		}
 	}
 
+	/**
+	 * Objet vide qui sera utiliser comme mutex
+	 */
 	private static class Lock {}
+	/**
+	 * Gère un timer. permet de reset ou annulé certains événements.
+	 * Utiliser pour renvoyer des trames si on n'a pas de réponse depuis un moment
+	 */
 	private static class Temporisateur {
 		HashMap<Marker, TimerTask> markers = new HashMap<>();
 		private Timer timer = new Timer(true);
@@ -981,11 +1253,17 @@ public class IO {
 			if (old != null) old.cancel();
 		}
 	}
+	/**
+	 * Décrit un des évenement que le temporisateur doir surveiller
+	 */
 	private static class Marker {
 		IO self;
 		Marker(IO self) { this.self = self; }
 		public void run() {}
 	}
+	/**
+	 * Wrapper autour de TimerTask pour que celle ci utilise la fonction run() du marqueur désiré
+	 */
 	private static class MarkerTask extends TimerTask {
 		Marker src;
 		MarkerTask(Marker src) {this.src = src;}

@@ -3,6 +3,9 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Optional;
 
+/**
+ * Logique pour recevoir des trames
+ */
 public class TrameReceiver {
 	/**
 	 * Lit la prochaine trame du stream entrant

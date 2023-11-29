@@ -2,6 +2,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
+/**
+ * Logique pour transmettre des trames
+ */
 public class TrameSender {
 	public static final Word EMPTY = new Word("11111111");
 

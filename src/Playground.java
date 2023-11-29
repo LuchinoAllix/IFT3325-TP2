@@ -10,6 +10,8 @@ import java.util.Scanner;
 public class Playground {
 	
 	public static void main(String... args) {
+
+		
 		OutputStream fakeOutput = new FakeReceiver();
 		InputStream fakeInput = new FakeSender();
 		Logger log = new Logger(true);
@@ -24,9 +26,17 @@ public class Playground {
 		}
 		if (io.estConnecte()) System.out.println("CONNECTÉ");
 		else System.out.println("FERMÉ");
+		System.out.println("CANSEND: " + io.canSend());
+		System.out.println("CANRECEIVE: " + io.canReceive());
+		System.out.println("MODE: " + io.getMode());
+
+		while (!io.estFerme()) {
+			try {Thread.sleep(100);} catch (InterruptedException e) {e.printStackTrace();}
+		}
 
 		io.fermeConnexion();
-		
+		System.out.println("FIN");
+		 
 
 		//new InOutConnector(fakeInput, fakeOutput);
 

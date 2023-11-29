@@ -652,13 +652,13 @@ public class IO {
 			do  {
 				if (this.kill) break;
 				try {
-					System.out.println("Cherche une trame");
+					//System.out.println("Cherche une trame");
 					Optional<Trame> t = TrameReceiver.receiveTrame(this.in_stream);
-					System.out.println("Trouvé: " + t);
+					//System.out.println("Trouvé: " + t);
 					if (!t.isPresent()) { // stream fermé, on quitte
 						this.status = Status.CLOSED;
 					} else {
-						this.logln("<< " + t);
+						this.logln("<< " + t.get());
 						receive(t.get());
 					}
 				} catch (Trame.TrameException e) {
@@ -752,6 +752,7 @@ public class IO {
 		if (this.status == Status.NEW) {
 			// on active la connexion et on envoi un P et un RR en confirmation
 			this.status = Status.CONNECTED;
+			this.mode = t.goBackN()? Mode.GBN : Mode.SELECT;
 			this.role = Role.SERVER;
 			queue_ctrl(Trame.rr(this.in_at));
 			queue_ctrl(Trame.p());
@@ -793,9 +794,10 @@ public class IO {
 			// on envoie la trame par la queue de ctrl
 			queue_ctrl(ret);
 			return true;
+		} else {
+			this.logln("\tignore (pas de connexion)");
+			return false;
 		}
-		this.logln("\tignore (pas de connexion)");
-		return false;
 	}
 	/**
 	 * Gère la réception d'une trame P
@@ -973,6 +975,10 @@ public class IO {
 	public boolean estFerme() {
 		return this.status == Status.CLOSED;
 	}
+
+	public boolean canReceive() {return this.can_receive;}
+	public boolean canSend() {return this.can_send;}
+	public Optional<Mode> getMode() { return Optional.ofNullable(this.mode); }
 
 	/**
 	 * Retourne un InputStream bloquant permettant de lire les bytes reçu par ce IO

@@ -1492,9 +1492,9 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		if (at >= this.length) return Optional.empty();
 		// pas 10 manieres de le faire...
 		outer:
-		while (at-this.length < 0) {
+		while (at+pattern.length <= this.length) {
 			// deux situation: on est aligné sur un byte (facile) ou non (moins facile)
-			if (at%8 == 0) {
+			/*if (at%8 == 0) {
 				// ici on peut checker un byte à la fois au lieu de bit par bit
 				int count = 0;
 				while (count < pattern.array.length) {
@@ -1508,20 +1508,20 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 					count += 1;
 				}
 				return Optional.of(at);
-			} else {
+			} else {*/
 				// similaire a avant, mais bit par bit
 				int count = 0;
 				while (count < pattern.length) {
 					boolean b1 = this.getBitAt(at + count);
-					boolean b2 = pattern.getBitAt(at + count);
-					if (b1^b2) { // b1 et b2 sot different
+					boolean b2 = pattern.getBitAt(count);
+					if (b1^b2) { // b1 et b2 sont different
 						at += 1;
 						continue outer;
 					}
 					count += 1;
 				}
 				return Optional.of(at);
-			}
+			/*}*/
 		}
 		return Optional.empty();
 	}

@@ -235,7 +235,7 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 	public static Trame decode(Word bits, CRC gen) throws TrameException {
 		int gen_len = gen.codeLength();
 		int min_nb_of_bits = 16 + gen_len;
-		if (bits.length < min_nb_of_bits) throw new TrameException("Trame trop petite"); 
+		if (bits.length < min_nb_of_bits) throw new TrameException("Trame trop petite: " + bits.length + "/" + min_nb_of_bits + " ("+ bits +")"); 
 		// vérification du crc
 		boolean check = gen.isValid(bits);
 		if (!check) throw new TrameException("crc incorecte");

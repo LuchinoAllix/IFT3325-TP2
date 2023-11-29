@@ -61,13 +61,18 @@ public class TrameSender {
 		while (iter.hasNext()) {
 			boolean b = iter.next();
 			arr.add(b);
-			if (b) nb_of_ones += 1;
-			else nb_of_ones = 0;
+			if (b) 
+				nb_of_ones += 1;
+			else 
+				nb_of_ones = 0;
+			//System.out.print(nb_of_ones);
 			if (nb_of_ones == 5) {
 				arr.add(false);
 				nb_of_ones = 0;
+				//System.out.print('X');
 			}
 		}
+		//System.out.println();
 		boolean[] arrb = new boolean[arr.size()];
 		for (int i=0; i< arrb.length; i+=1) arrb[i] = arr.get(i);
 		return new Word(arrb);

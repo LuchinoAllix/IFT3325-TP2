@@ -15,9 +15,9 @@ public class TrameReceiver {
 
 		// On cherche le flag de début en cherchant 6 (et uniquement 6) 1 d'affilé
 		while (curr_word == null) {
-			int r = stream.read();
-			if (r < 0) return Optional.empty(); // stream terminé
-			boolean b = r != 0;
+			Optional<Boolean> r = readNextBit(stream);
+			if (r.isEmpty()) return Optional.empty(); // stream terminé
+			boolean b = r.get();
 			if (b) {
 				nb_of_ones += 1;
 			} else {
@@ -29,9 +29,9 @@ public class TrameReceiver {
 		// on collectione les bit de la trame
 		while (true) {
 			// même chose qu'avant, s'assure que le stream existe encore
-			int r = stream.read();
-			if (r < 0) return Optional.empty(); // stream terminé
-			boolean b = r != 0;
+			Optional<Boolean> r = readNextBit(stream);
+			if (r.isEmpty()) return Optional.empty(); // stream terminé
+			boolean b = r.get();
 
 			if (b) {
 				nb_of_ones += 1;
@@ -51,6 +51,7 @@ public class TrameReceiver {
 					curr_word.add(b);
 					nb_of_ones = 0;
 				}
+				nb_of_ones = 0;
 			}
 		}
 	}
@@ -65,5 +66,15 @@ public class TrameReceiver {
 			if (b < 0) return Optional.empty();
 			return Optional.of(b != 0);
 		} catch (IOException e) {return Optional.empty();}
+	}
+
+	public static Trame receiveTrame(Word bits) throws Trame.TrameException {
+		Optional<Integer> ff = bits.find(Trame.FLAG);
+		if (ff.isEmpty()) throw new Trame.TrameException("Pas de trame dans la chaîne");
+		int s = ff.get() + Trame.FLAG.length;
+		Optional<Integer> lf = bits.find(Trame.FLAG, s);
+		if (lf.isEmpty()) throw new Trame.TrameException("Pas de trame dans la chaîne");
+		int e = lf.get();
+		return Trame.decode(bits.subWord(s, e), CRC.CRC_CCITT);
 	}
 }

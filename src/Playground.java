@@ -75,15 +75,19 @@ public class Playground {
 		}
 		if (io.estConnecte()) System.out.println("CONNECTÉ");
 		else System.out.println("FERMÉ");
-		System.out.println("CANSEND: " + io.canSend());
-		System.out.println("CANRECEIVE: " + io.canReceive());
-		System.out.println("MODE: " + io.getMode());
+		//System.out.println("CANSEND: " + io.canSend());
+		//System.out.println("CANRECEIVE: " + io.canReceive());
+		//System.out.println("MODE: " + io.getMode());
 
+		/*
 		PrintWriter writer = new PrintWriter(io.getOutputStream());
 		String str = "Le monde de par chez nous...";
 		System.out.println("strlen: " + str.getBytes().length);
 		writer.println(str);
 		writer.flush();
+		*/
+
+		new Echo(io.getInputStream(), io.getOutputStream());
 
 		while (!io.estFerme()) {
 			try {Thread.sleep(100);} catch (InterruptedException e) {e.printStackTrace();}

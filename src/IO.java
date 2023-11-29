@@ -621,7 +621,7 @@ public class IO {
 								if (t == null) break; // si t est encore null, on a plus rien a envoyer alors on quitte la boucle
 							}
 							send_trame(t);
-							this.out_at += 1;
+							this.out_at = (this.out_at+1)%8;
 							this.temporisateur.reset(temp_send);
 						}
 					}

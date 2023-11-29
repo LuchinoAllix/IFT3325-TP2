@@ -51,12 +51,17 @@ public class Sender{
 			méthode = Integer.parseInt(args[3]);
 			IO.Mode mode = IO.Mode.fromNum(méthode);
 			File file = new File(args[2]);
-			FileInputStream input = new FileInputStream(file);
+			BufferedReader input = new BufferedReader(new FileReader(file));
 			
 			startConnection(machine,port,mode);
-			writer.print(input);
-			writer.flush();
-			while (io.data() > 0) {
+			String ln;
+			while ((ln = input.readLine()) != null) {
+				//System.out.println(ln);
+				writer.println(ln);
+			}
+			//writer.print(input);
+			//writer.flush();
+			while (io.data() > 0 || !io.allReceived()) {
 				Thread.sleep(100);
 			}
 			input.close();

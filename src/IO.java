@@ -602,20 +602,6 @@ public class IO {
 						this.logln("Peut maintenant recevoir des trames I");
 					}
 
-					//System.out.println("*" + this.out_ctrl_queue.size());
-					// Étape 1: envoyer toutes les trames de controle
-					//int i=0;
-					while (!this.out_ctrl_queue.isEmpty()) {
-						//i += 1;
-						//System.out.println(i);
-						Trame trame = this.out_ctrl_queue.poll();
-						send_trame(trame);
-						if (trame.getType() == Trame.Type.F) {
-							// fermer le noeud
-							break sendloop;
-						}
-					}
-
 					// Étape 2: envoyer toutes les trames I
 					if (this.can_send && this.mode != null) {
 						while (this.out_at != (this.out_start + this.mode.taille_fenetre)) {
@@ -630,6 +616,21 @@ public class IO {
 							this.temporisateur.reset(temp_send);
 						}
 					}
+
+					//System.out.println("*" + this.out_ctrl_queue.size());
+					// Étape 1: envoyer toutes les trames de controle
+					//int i=0;
+					while (!this.out_ctrl_queue.isEmpty()) {
+						//i += 1;
+						//System.out.println(i);
+						Trame trame = this.out_ctrl_queue.poll();
+						send_trame(trame);
+						if (trame.getType() == Trame.Type.F) {
+							// fermer le noeud
+							break sendloop;
+						}
+					}
+
 					//System.out.println("yielded");
 					try {this.out_lock.wait(100);}  catch (InterruptedException e) {}
 					//System.out.println("Took back");
@@ -685,7 +686,7 @@ public class IO {
 					if (!t.isPresent()) { // stream fermé, on quitte
 						break sendloop;
 					} else {
-						if (t.get().getType() == Trame.Type.I) this.logln("<< " + t.get() + new String(t.get().getMsg().get().toByteArray()) + " (" + ")");
+						if (t.get().getType() == Trame.Type.I) this.logln("<< " + t.get() + " (" + new String(t.get().getMsg().get().toByteArray()) + ")");
 						else if (t.get().getType() != Trame.Type.P) this.logln("<< " + t.get());
 						receive(t.get());
 					}
@@ -944,18 +945,16 @@ public class IO {
 	 * @param at
 	 */
 	private void avancer_out(int at) {
-		at %= 8;
-		if (this.out_start == at || this.mode == null) return;
-		// on veut 'effacer' les trames du buffer sur lesquels la fenêtre avance
-		// 1.1 trouver le nombre de trame à effacer
-		int nb_a_effacer = this.out_start < at ? at-this.out_start : at-this.out_start;
-		// 1.2 déplacer la fenêtre
-		this.out_start = at;
-		// 1.3 effacer les trames
-		for (int i=1; i<=nb_a_effacer; i+=1) {
-			int n = (this.out_start+this.mode.taille_fenetre-i)%8;
-			if (n < 0) n += 8;
-			this.out_buffer[n] = null;
+		synchronized (this.out_lock){
+			at %= 8;
+			if (this.out_start == at || this.mode == null) return;
+			// on veut 'effacer' les trames qui ne sont pas dans la fenêtre
+			this.out_start = at;
+			for (int i=0; i < 8; i+=1) {
+				if (!in(i, at, (at+this.mode.taille_fenetre)%8)) {
+					this.out_buffer[i] = null;
+				}
+			}
 		}
 	}
 
@@ -1021,6 +1020,19 @@ public class IO {
 				return this.write_len;
 			}
 		}
+	}
+
+	/**
+	 * Indique si toutes les trames envoyés ont été reçu
+	 * @return
+	 */
+	public boolean allReceived() {
+		synchronized (this.out_lock) {
+			for (int i=0; i<8; i+=1) {
+				if (this.out_buffer[i] != null) return false;
+			}
+		}
+		return true;
 	}
 
 	public boolean canReceive() {return this.can_receive;}

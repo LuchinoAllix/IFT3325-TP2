@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -79,7 +80,10 @@ public class Playground {
 		System.out.println("MODE: " + io.getMode());
 
 		PrintWriter writer = new PrintWriter(io.getOutputStream());
-		writer.println("Le monde de par chez nous...");
+		String str = "Le monde de par chez nous...";
+		System.out.println("strlen: " + str.getBytes().length);
+		writer.println(str);
+		writer.flush();
 
 		while (!io.estFerme()) {
 			try {Thread.sleep(100);} catch (InterruptedException e) {e.printStackTrace();}
@@ -191,7 +195,12 @@ public class Playground {
 						//System.out.println("\n"+wrd);
 						try {
 							Trame t = Trame.decode(wrd, CRC.CRC_CCITT);
-							System.out.println("<<< " + t);
+							if (t instanceof Trame.I i) {
+								String msg = t.getMsg().map(tt -> new String(tt.toByteArray(), StandardCharsets.UTF_8)).orElse("");
+								System.out.println("<<< " + t + " (" + msg + ")");
+							} else {
+								System.out.println("<<< " + t);
+							}
 						} catch (Trame.TrameException e) {
 							e.printStackTrace();
 							System.out.println("<<< ERREUR");

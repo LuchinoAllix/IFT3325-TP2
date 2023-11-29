@@ -135,6 +135,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param len
 	 */
 	public Word(byte[] arr, int len) {
+		if (len > 8*arr.length || len < 0) throw new IllegalArgumentException();
 		this.array = arr;
 		this.length = len;
 	}
@@ -582,29 +583,15 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		int n = len/8 + (len%8==0? 0 : 1);
 		byte[] arr = new byte[n];
 
-		int curr_w = 0;
-		int curr_len = 0;
-		int curr_start = 0;
-		while (curr_w < ws.length) {
-			byte[] w = ws[curr_w].array;
-			int offset = curr_len%8;
-			if (offset == 0) { // tout est aligné déjà, on peut arraycopy
-				System.arraycopy(w, 0, arr, curr_start, w.length);
-			} else { // push les byte 1 par 1
-				int mask = first_bits_mask(offset);
-				int o = 8-offset;
-				for (int i = 0; i < w.length; i++) {
-					// rajoute les premiers bits au byte courant
-					// et initialise le prochain avec les bits restant
-					int b1 = (arr[curr_start+i]&mask) | ((w[i]&255) >>> offset);
-					int b2 = (w[i]&255) << o;
-					arr[curr_start + i] = (byte)b1;
-					arr[curr_start+i+1] = (byte)b2;
-				}
+		//int curr_w = 0;
+		//int curr_len = 0;
+		int curr_pos = 0;
+		for (Word w : ws) {
+			for (int i=0; i<w.array.length; i+=1) {
+				Request<Byte> br = byte_at(w.array, w.length, i*8, false);
+				set_n_bits_at(arr, len, curr_pos, br.len, br.value, false);
+				curr_pos += br.len;
 			}
-			curr_len += ws[curr_w].length;
-			curr_w += 1;
-			curr_start = curr_len/8;
 		}
 
 		return new ConcatRequest(arr, len);

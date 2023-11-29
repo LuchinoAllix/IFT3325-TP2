@@ -654,7 +654,11 @@ public class IO {
 		}
 	}
 	private void send_trame(Trame t) throws IOException {
-		this.logln(">> " + t);
+		if (t instanceof Trame.I) {
+			this.logln(">> " + t + " (" + this.write_len + " bytes restant)");
+		} else {
+			this.logln(">> " + t);
+		}
 		TrameSender.sendTrame(this.out_stream, t);
 	}
 
@@ -680,7 +684,7 @@ public class IO {
 					}
 				} catch (Trame.TrameException e) {
 					// ignore la trame
-					System.out.println("Trouvé Erroné");
+					//System.out.println("Trouvé Erroné");
 				} catch (IOException e) {
 					e.printStackTrace();
 					this.status = Status.CLOSED;
@@ -859,13 +863,22 @@ public class IO {
 	 * ferme tout et lâche les ressources. Bloque le thread jusqu'à temps que tout soit fermé
 	 * @return true lorsque tout est fermé
 	 */
-	private synchronized boolean close_all() {
+	private boolean close_all() {
+		if (this.status == Status.CLOSED) return true;
 		this.status = Status.CLOSED;
+		synchronized (this.out_lock) {
+			this.out_lock.notifyAll();
+		}
+		synchronized (this.in_lock) {
+			this.in_lock.notifyAll();
+		}
+		/*
 		while (this.in_stream != null && this.out_stream != null) { // on attend
 			try {
-				this.wait();
+				this.wait(10);
 			} catch (InterruptedException e) {}
 		}
+		*/
 		// abandonne les autres ressources
 		/*
 		synchronized(this.read_lock) {
@@ -877,8 +890,8 @@ public class IO {
 			this.write_lock.notifyAll();
 			this.write_buffer = null;
 		}
-		this.in_thread = null;
-		this.out_thread = null;
+		//this.in_thread = null;
+		//this.out_thread = null;
 
 		return true;
 	}
@@ -891,10 +904,10 @@ public class IO {
 		//while (this.status == Status.CONNECTED) 
 		synchronized (this.write_lock) {
 			if (this.write_len > 0) { // on a des bytes a envoyer !!!
-				int len = Math.max(MAX_I_TRAME_SIZE, this.write_len);
+				int len = Math.min(MAX_I_TRAME_SIZE, this.write_len);
 				byte[] bytes = new byte[len];
 				System.arraycopy(this.write_buffer, this.write_at, bytes, 0, len);
-				Word msg = new Word(bytes, len);
+				Word msg = new Word(bytes, len*8);
 				this.write_at += len;
 				this.write_len -= len;
 				Trame t = Trame.i(this.out_at, msg);
@@ -1099,6 +1112,33 @@ public class IO {
 				new_buffer[self.write_len] = (byte)b;
 				self.write_len += 1;
 				self.write_buffer = new_buffer;
+
+				self.write_lock.notifyAll();
+			}
+			synchronized (self.out_lock) {
+				self.out_lock.notifyAll();
+			}
+			if (e != null) throw e;
+		}
+		@Override
+		public void write(byte[] b, int off, int len) throws IOException {
+			RuntimeException e = null;
+			if (self.status == Status.NEW || self.status == Status.WAITING) e = new NoConnexionException("Connexion pas encore ouverte");
+			if (self.status == Status.CLOSED) throw new IOException("Connexion fermée");
+			synchronized (self.write_lock) {
+				// réarranger le buffer
+				// si on n'a plus de place, il faut créer un nouveau, sinon on peut le réutiliser
+				//System.out.println("adding " + b.length + " (" + len + ") bytes");
+				byte[] new_buffer = self.write_len == 0 ? new byte[len] : new byte[self.write_len + len];
+				// on regarde si on doit copier le buffer
+				if (self.write_len != 0) {
+					System.arraycopy(self.write_buffer, self.write_at, new_buffer, 0, self.write_len);
+				}
+				System.arraycopy(b, off, new_buffer, self.write_len, len);
+				// rajouter le byte
+				self.write_len += len;
+				self.write_buffer = new_buffer;
+				self.write_at = 0;
 
 				self.write_lock.notifyAll();
 			}

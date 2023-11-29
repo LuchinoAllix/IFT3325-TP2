@@ -18,7 +18,8 @@ public class Sender{
 		Logger log = new Logger();
 		io.setLogger(log);
 		writer = new PrintStream(io.getOutputStream());
-		io.ouvreConnexion(mode);
+		// boucle jusqu'à ce qu'on soit connecté, ou qu'on soit assuré que la connexion est impossible
+		while (!io.ouvreConnexion(mode)) try { Thread.sleep(100); } catch (InterruptedException e) {}
 	}
 
 

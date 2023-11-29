@@ -1179,7 +1179,7 @@ public class IO {
 		private IO self;
 		private OutputThread(IO self) { 
 			this.self = self; 
-			this.setDaemon(true);
+			//this.setDaemon(true);
 		}
 		@Override
 		public void run() {

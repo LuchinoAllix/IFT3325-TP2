@@ -24,6 +24,7 @@ public class Sender{
 
 
 	public static void stopConnection() throws IOException {
+		io.fermeConnexion();
 		io.getInputStream().close();
 		io.getOutputStream().close();
 		clientSocket.close();

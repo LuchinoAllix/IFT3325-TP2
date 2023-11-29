@@ -1,6 +1,7 @@
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -12,6 +13,53 @@ public class Playground {
 	public static void main(String... args) {
 
 		
+		test_io();
+
+		//new InOutConnector(fakeInput, fakeOutput);
+
+	}
+
+	static void exp_thread() {
+		Object lock = new Object();
+		Thread a = new Thread(() -> {
+			for (int i=0; i < 10; i += 1) {
+				synchronized (lock) {
+					System.out.println("A LOCK...");
+					try {
+						Thread.sleep(1000);
+						System.out.println("A FREE?");
+						lock.notifyAll();
+						lock.wait();
+					} catch (InterruptedException e) {
+
+					}
+					
+				}
+			}
+		});
+		Thread b = new Thread(() -> {
+			for (int i=0; i < 10; i += 1) {
+				synchronized (lock) {
+					System.out.println("B LOCK...");
+					try {
+						Thread.sleep(1000);
+						System.out.println("B FREE?");
+						lock.notifyAll();
+						lock.wait();
+					} catch (InterruptedException e) {
+
+					}
+					
+				}
+			}
+		});
+		//a.setDaemon(true);
+		//a.setDaemon(true);
+		a.start();
+		b.start();
+	}
+
+	static void test_io() {
 		OutputStream fakeOutput = new FakeReceiver();
 		InputStream fakeInput = new FakeSender();
 		Logger log = new Logger(true);
@@ -30,16 +78,15 @@ public class Playground {
 		System.out.println("CANRECEIVE: " + io.canReceive());
 		System.out.println("MODE: " + io.getMode());
 
+		PrintWriter writer = new PrintWriter(io.getOutputStream());
+		writer.println("Le monde de par chez nous...");
+
 		while (!io.estFerme()) {
 			try {Thread.sleep(100);} catch (InterruptedException e) {e.printStackTrace();}
 		}
 
 		io.fermeConnexion();
 		System.out.println("FIN");
-		 
-
-		//new InOutConnector(fakeInput, fakeOutput);
-
 	}
 
 	static void test_crc(String wrd, String goal) {
@@ -144,10 +191,10 @@ public class Playground {
 						//System.out.println("\n"+wrd);
 						try {
 							Trame t = Trame.decode(wrd, CRC.CRC_CCITT);
-							System.out.println("<< " + t);
+							System.out.println("<<< " + t);
 						} catch (Trame.TrameException e) {
 							e.printStackTrace();
-							System.out.println("<< ERREUR");
+							System.out.println("<<< ERREUR");
 						}
 						curr_word = null;
 					}

@@ -195,21 +195,23 @@ public class IO {
 							self.read_at = 0;
 							self.read_len = new_len;
 							self.read_buffer = new_buffer;
+							self.read_lock.notifyAll();
 						}
 						// incr. l'attente
 						synchronized (self.in_lock) {
 							self.in_at = (n+1)%8;
+							//System.out.println("RECU " + n + " ATTEND " + self.in_at);
 							// envoyer une confirmation selon la place qu'il nous reste
 							if (self.read_len >= IO.MAX_BYTES_IN_BUFFER) {
 								self.temporisateur.cancel(self.temp_ack);
 								self.can_receive = false;
-								self.logln("\tenvoi rnr("+n+")");
-								return Trame.rnr(n);
+								//self.logln("\tenvoi rnr("+self.in_at+")");
+								return Trame.rnr(self.in_at);
 							} else {
 								self.temporisateur.reset(self.temp_ack);
 								self.can_receive = true;
-								self.logln("\tenvoi rr("+n+")");
-								return Trame.rr(n);
+								//self.logln("\tenvoi rr("+self.in_at+")");
+								return Trame.rr(self.in_at);
 							}
 						}
 					} else {
@@ -276,6 +278,7 @@ public class IO {
 									self.read_at = 0;
 									self.read_len = new_len;
 									self.read_buffer = new_buffer;
+									self.read_lock.notifyAll();
 								}
 								self.in_buffer[n] = null;
 								n = (n+1)%8;
@@ -584,26 +587,32 @@ public class IO {
 		try {
 			do {
 				if (this.kill) break;
+
 				// Étape 0: si on peut recommencer à recevoir des trames, le signaler
-				synchronized (this.in_lock) {
+				//synchronized (this.in_lock) {
+				//	
+				//}
+
+				synchronized (this.out_lock) {
 					if (!this.can_receive && this.read_len < IO.MAX_BYTES_IN_BUFFER) {
 						this.can_receive = true;
 						this.temporisateur.reset(temp_ack);
 						queue_ctrl(Trame.rr(this.in_at));
 						this.logln("Peut maintenant recevoir des trames I");
 					}
-				}
-				// Étape 1: envoyer toutes les trames de controle
-				synchronized (this.out_ctrl_queue) {
+
+					//System.out.println("*" + this.out_ctrl_queue.size());
+					// Étape 1: envoyer toutes les trames de controle
+					//int i=0;
 					while (!this.out_ctrl_queue.isEmpty()) {
+						//i += 1;
+						//System.out.println(i);
 						Trame trame = this.out_ctrl_queue.poll();
-						TrameSender.sendTrame(out_stream, trame);
+						send_trame(trame);
 					}
-				}
-				
-				// Étape 2: envoyer toutes les trames I
-				if (this.can_send && this.mode != null) {
-					synchronized (this.out_lock) {
+
+					// Étape 2: envoyer toutes les trames I
+					if (this.can_send && this.mode != null) {
 						while (this.out_at != (this.out_start + this.mode.taille_fenetre)) {
 							Trame t = this.out_buffer[this.out_at];
 							if (t == null) { // si t == null, alors on peut remplir avec des trames de la queue
@@ -611,11 +620,14 @@ public class IO {
 								t = this.out_buffer[this.out_at] = next.orElse(null);
 								if (t == null) break; // si t est encore null, on a plus rien a envoyer alors on quitte la boucle
 							}
-							TrameSender.sendTrame(out_stream, t);
+							send_trame(t);
 							this.out_at += 1;
+							this.temporisateur.reset(temp_send);
 						}
 					}
-					this.temporisateur.reset(temp_send);
+					//System.out.println("yielded");
+					try {this.out_lock.wait();}  catch (InterruptedException e) {}
+					//System.out.println("Took back");
 				}
 			} while (this.status != Status.CLOSED);
 		} catch (IOException e) {
@@ -638,10 +650,15 @@ public class IO {
 				this.out_lock.notifyAll();
 				this.out_buffer = null;
 			}
+			this.close_all();
 		}
-		this.close_all();
 	}
-	
+	private void send_trame(Trame t) throws IOException {
+		this.logln(">> " + t);
+		TrameSender.sendTrame(this.out_stream, t);
+	}
+
+
 	/**
 	 * Boucle s'occupant de recevoir toutes les trames entrantes
 	 * 
@@ -792,7 +809,7 @@ public class IO {
 			// on délègue la logique au mode
 			Trame ret = this.mode.update_in(this, t);
 			// on envoie la trame par la queue de ctrl
-			queue_ctrl(ret);
+			if (ret != null) queue_ctrl(ret);
 			return true;
 		} else {
 			this.logln("\tignore (pas de connexion)");
@@ -809,9 +826,10 @@ public class IO {
 	 private boolean receive_p(Trame.P t) throws Trame.TrameException {
 		// on fait juste le renvoyer si on est connecté
 		if (this.status == Status.CONNECTED){
+			//System.out.println("add to queue");
 			queue_ctrl(Trame.p());
 			if (this.role == Role.SERVER) this.temporisateur.reset(this.temp_p);
-			this.logln("\trenvoi");
+			this.logln("\trenvoi P");
 			return true;
 		}
 		// sinon ignore
@@ -870,7 +888,8 @@ public class IO {
 	 * @return la nouvelle trame I. Empty s'il n'y a rien a envoyer
 	 */
 	private Optional<Trame> mk_prochaine_trame() {
-		while (this.status == Status.CONNECTED) synchronized (this.write_lock) {
+		//while (this.status == Status.CONNECTED) 
+		synchronized (this.write_lock) {
 			if (this.write_len > 0) { // on a des bytes a envoyer !!!
 				int len = Math.max(MAX_I_TRAME_SIZE, this.write_len);
 				byte[] bytes = new byte[len];
@@ -879,10 +898,12 @@ public class IO {
 				this.write_at += len;
 				this.write_len -= len;
 				Trame t = Trame.i(this.out_at, msg);
+				this.write_lock.notifyAll();
 				return Optional.of(t);
+			} else {
+				return Optional.empty();
 			}
 		}
-		return Optional.empty();
 	}
 
 	/**
@@ -890,8 +911,11 @@ public class IO {
 	 * @param t
 	 */
 	private void queue_ctrl(Trame t) {
-		synchronized (this.out_ctrl_queue) {
+		synchronized (this.out_lock) {
+			//System.out.println("add 2 queee");
 			this.out_ctrl_queue.add(t);
+			this.out_lock.notifyAll();
+			//System.out.println("notified");
 		}
 	}
 
@@ -1077,6 +1101,9 @@ public class IO {
 				self.write_buffer = new_buffer;
 
 				self.write_lock.notifyAll();
+			}
+			synchronized (self.out_lock) {
+				self.out_lock.notifyAll();
 			}
 			if (e != null) throw e;
 		}

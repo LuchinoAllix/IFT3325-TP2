@@ -585,6 +585,7 @@ public class IO {
 	*/ 
 	private void send() {
 		try {
+			sendloop:
 			do {
 				if (this.kill) break;
 
@@ -609,6 +610,10 @@ public class IO {
 						//System.out.println(i);
 						Trame trame = this.out_ctrl_queue.poll();
 						send_trame(trame);
+						if (trame.getType() == Trame.Type.F) {
+							// fermer le noeud
+							break sendloop;
+						}
 					}
 
 					// Étape 2: envoyer toutes les trames I
@@ -626,7 +631,7 @@ public class IO {
 						}
 					}
 					//System.out.println("yielded");
-					try {this.out_lock.wait();}  catch (InterruptedException e) {}
+					try {this.out_lock.wait(100);}  catch (InterruptedException e) {}
 					//System.out.println("Took back");
 				}
 			} while (this.status != Status.CLOSED);
@@ -670,6 +675,7 @@ public class IO {
 	 */
 	private void receive() {
 		//try {
+			sendloop:
 			do  {
 				if (this.kill) break;
 				try {
@@ -677,7 +683,7 @@ public class IO {
 					Optional<Trame> t = TrameReceiver.receiveTrame(this.in_stream);
 					//System.out.println("Trouvé: " + t);
 					if (!t.isPresent()) { // stream fermé, on quitte
-						this.status = Status.CLOSED;
+						break sendloop;
 					} else {
 						this.logln("<< " + t.get());
 						receive(t.get());
@@ -687,8 +693,7 @@ public class IO {
 					//System.out.println("Trouvé Erroné");
 				} catch (IOException e) {
 					e.printStackTrace();
-					this.status = Status.CLOSED;
-					break;
+					break sendloop;
 				}
 			} while (this.status != Status.CLOSED);
 		//} catch (IOException e) {
@@ -872,20 +877,9 @@ public class IO {
 		synchronized (this.in_lock) {
 			this.in_lock.notifyAll();
 		}
-		/*
-		while (this.in_stream != null && this.out_stream != null) { // on attend
-			try {
-				this.wait(10);
-			} catch (InterruptedException e) {}
-		}
-		*/
-		// abandonne les autres ressources
-		/*
-		synchronized(this.read_lock) {
-			this.read_lock.notifyAll();
-			this.read_buffer = null;
-		}
-		*/
+		// arrête le temporsisateur
+		this.temporisateur.stop();
+
 		synchronized(this.write_lock) {
 			this.write_lock.notifyAll();
 			this.write_buffer = null;
@@ -988,7 +982,9 @@ public class IO {
 	 * @return
 	 */
 	public boolean fermeConnexion() {
-		close_all();
+		//close_all();
+		queue_ctrl(Trame.end());
+		while (this.status != Status.CLOSED) {try {Thread.sleep(100);} catch (InterruptedException e) {}}
 		return true;
 	}
 	/**
@@ -1067,7 +1063,7 @@ public class IO {
 			if (self.status == Status.NEW || self.status == Status.WAITING) throw new NoConnexionException("Connexion pas encore ouverte");
 			synchronized (self.read_lock) {
 				while (self.status == Status.CONNECTED) {
-					if (self.read_len == 0) try {self.read_lock.wait();} catch (InterruptedException e) {}
+					if (self.read_len == 0) try {self.read_lock.wait(100);} catch (InterruptedException e) {}
 					else {
 						int ret = self.read_buffer[self.read_at];
 						self.read_at += 1;
@@ -1204,6 +1200,7 @@ public class IO {
 		HashMap<Marker, TimerTask> markers = new HashMap<>();
 		private Timer timer = new Timer(true);
 		void reset(Marker marker) {
+			if (this.timer == null) return;
 			TimerTask old = this.markers.get(marker);
 			if (old != null) old.cancel();
 			TimerTask new_task = new MarkerTask(marker);
@@ -1211,8 +1208,13 @@ public class IO {
 			this.markers.put(marker, new_task);
 		}
 		void cancel(Marker marker) {
+			if (this.timer == null) return;
 			TimerTask old = this.markers.remove(marker);
 			if (old != null) old.cancel();
+		}
+		void stop() {
+			this.timer.cancel();
+			this.timer = null;
 		}
 	}
 	/**

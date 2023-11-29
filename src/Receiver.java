@@ -11,6 +11,8 @@ public class Receiver{
 		serverSocket = new ServerSocket(port);
 		clientSocket = serverSocket.accept();
 		io = new IO(clientSocket.getInputStream(),clientSocket.getOutputStream());
+		Logger log = new Logger();
+		io.setLogger(log);
 	}
 
 	public static void stop() throws IOException {

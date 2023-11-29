@@ -634,7 +634,7 @@ public class IO {
 			System.err.println(e);
 		} finally {
 			// ferme le in_stream
-			this.logln("Ferme les stream sortants");
+			this.logln("Ferme les streams sortants");
 			//try {
 			//	if (out_stream != null) out_stream.close();
 			//} catch (IOException e) {

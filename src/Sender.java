@@ -14,6 +14,9 @@ public class Sender{
 		in_stream = clientSocket.getInputStream();
 		out_stream = clientSocket.getOutputStream();
 		io = new IO(in_stream,out_stream);
+
+		Logger log = new Logger();
+		io.setLogger(log);
 		writer = new PrintStream(io.getOutputStream());
 		io.ouvreConnexion(mode);
 	}
@@ -40,6 +43,9 @@ public class Sender{
 			
 			startConnection(machine,port,mode);
 			writer.print(input);
+			while (!io.estFerme()) {
+				Thread.sleep(100);
+			}
 			input.close();
 			stopConnection();
 
@@ -55,6 +61,9 @@ public class Sender{
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(0);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}	
 	}
 }

@@ -645,9 +645,10 @@ public class IO {
 			//} catch (IOException e) {
 			//	System.err.println(e);
 			//} finally {
-				out_stream = null;
+			out_stream = null;
 			//}
 			// signale qu'on peut arrêter
+			this.close_all();
 			synchronized (this) {
 				this.notifyAll();
 			}
@@ -655,13 +656,12 @@ public class IO {
 				this.out_lock.notifyAll();
 				this.out_buffer = null;
 			}
-			this.close_all();
 		}
 	}
 	private void send_trame(Trame t) throws IOException {
 		if (t instanceof Trame.I) {
 			this.logln(">> " + t + " (" + this.write_len + " bytes restant)");
-		} else {
+		} else if (t.getType() != Trame.Type.P) {
 			this.logln(">> " + t);
 		}
 		TrameSender.sendTrame(this.out_stream, t);
@@ -685,7 +685,8 @@ public class IO {
 					if (!t.isPresent()) { // stream fermé, on quitte
 						break sendloop;
 					} else {
-						this.logln("<< " + t.get());
+						if (t.get().getType() == Trame.Type.I) this.logln("<< " + t.get() + new String(t.get().getMsg().get().toByteArray()) + " (" + ")");
+						else if (t.get().getType() != Trame.Type.P) this.logln("<< " + t.get());
 						receive(t.get());
 					}
 				} catch (Trame.TrameException e) {
@@ -704,6 +705,7 @@ public class IO {
 			// ferme le in_stream
 			this.logln("Ferme les stream entrant");
 			this.in_stream = null;
+			this.close_all();
 			// signale qu'on peut arrêter
 			synchronized (this) {
 				this.notifyAll();
@@ -712,7 +714,7 @@ public class IO {
 				this.in_lock.notifyAll();
 				this.in_buffer = null;
 			}
-			this.close_all();
+			
 		//}
 	}
 	/** gère la réception des trames de type inconnu
@@ -838,7 +840,7 @@ public class IO {
 			//System.out.println("add to queue");
 			queue_ctrl(Trame.p());
 			if (this.role == Role.SERVER) this.temporisateur.reset(this.temp_p);
-			this.logln("\trenvoi P");
+			//this.logln("\trenvoi P");
 			return true;
 		}
 		// sinon ignore
@@ -1007,6 +1009,18 @@ public class IO {
 	 */
 	public boolean estFerme() {
 		return this.status == Status.CLOSED;
+	}
+
+	/**
+	 * 
+	 * @return la quantité de byte qu'il reste à envoyer
+	 */
+	public int data() {
+		synchronized (this.out_lock) {
+			synchronized (this.write_lock) {
+				return this.write_len;
+			}
+		}
 	}
 
 	public boolean canReceive() {return this.can_receive;}

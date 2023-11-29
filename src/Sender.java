@@ -10,7 +10,18 @@ public class Sender{
 	private static PrintStream writer;
 
 	public static void startConnection(String ip, int port, IO.Mode mode) throws UnknownHostException, IOException {
-		clientSocket = new Socket(ip, port);
+		System.out.print("Connexion");
+		while (clientSocket == null) {
+			System.out.print("."); System.out.flush();
+			try {
+				clientSocket = new Socket(ip, port);
+			} catch (IOException e){
+				clientSocket = null;
+				try { Thread.sleep(100); } catch (InterruptedException i) {}
+			}
+		}
+		System.out.println(" Établie!");
+		
 		in_stream = clientSocket.getInputStream();
 		out_stream = clientSocket.getOutputStream();
 		io = new IO(in_stream,out_stream);
@@ -44,7 +55,8 @@ public class Sender{
 			
 			startConnection(machine,port,mode);
 			writer.print(input);
-			while (!io.estFerme()) {
+			writer.flush();
+			while (io.data() > 0) {
 				Thread.sleep(100);
 			}
 			input.close();

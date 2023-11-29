@@ -11,34 +11,25 @@ public class Playground {
 	
 	public static void main(String... args) {
 		OutputStream fakeOutput = new FakeReceiver();
-		Trame t = null;
-		Scanner scanner = new Scanner(System.in);
+		InputStream fakeInput = new FakeSender();
+		Logger log = new Logger(true);
+		//Trame t = null;
+		//Scanner scanner = new Scanner(System.in);
+		
+		IO io = new IO(fakeInput, fakeOutput);
+		io.setLogger(log);
 
-		Trame p = Trame.p();
-
-		System.out.println(p.encode(CRC.CRC_CCITT));
-
-
-		while (t == null || t.getType() != Trame.Type.F) {
-			t = null;
-			do {
-				try {
-					System.out.println();
-					t = read_trame(scanner);
-					break;
-				} catch (Exception e) {
-					System.out.println("Trame Invalide");
-				}
-			} while(true);
-			if (t != null)
-			{
-				try {
-					TrameSender.sendTrame(fakeOutput, t);
-				} catch (IOException e) {
-					System.out.println("ERREUR");
-				}
-			}
+		while (!io.estConnecte() && !io.estFerme()) {
+			try {Thread.sleep(1000);} catch (InterruptedException e) {e.printStackTrace();}
 		}
+		if (io.estConnecte()) System.out.println("CONNECTÉ");
+		else System.out.println("FERMÉ");
+
+		io.fermeConnexion();
+		
+
+		//new InOutConnector(fakeInput, fakeOutput);
+
 	}
 
 	static void test_crc(String wrd, String goal) {
@@ -62,7 +53,7 @@ public class Playground {
 		System.out.println(Trame.end());
 	}
 
-	static class ConsoleInputStream extends InputStream {
+	static class FakeSender extends InputStream {
 		Word curr_trame;
 		int at = 0;
 		Scanner scanner = new Scanner(System.in);
@@ -72,8 +63,10 @@ public class Playground {
 			if (curr_trame != null && at < curr_trame.length) {
 				int b = curr_trame.getBitAt(at)? 1 : 0;
 				at += 1;
+				//System.out.print(b);
 				return b;
 			} else {
+				//System.out.println();
 				Trame t;
 				do {
 					try {
@@ -84,22 +77,28 @@ public class Playground {
 						System.out.println("Trame Invalide");
 					}
 				} while(true);
-				Word new_trame = Word.concat(new Word("01111110"), t.encode(CRC.CRC_CCITT), new Word("0111111011111111"));
+				Word new_trame = TrameSender.encodeTrame(t);
+				//System.out.println("**" + t + "**");
 				curr_trame = new_trame;
-				at = 0;
-				return read();
+				at = 1;
+				int b = curr_trame.getBitAt(0)? 1 : 0;
+				//System.out.print(b);
+				return b;
 			}
 		}
-		
 	}
 	static class FakeReceiver extends OutputStream {
 		ArrayList<Boolean> curr_word = null;
 		int nb_of_ones = 0;
-
+		OutputStream passto = null;
 		//Queue<Trame> trames = new ArrayDeque<>();
+
+		public FakeReceiver() {}
+		public FakeReceiver(OutputStream src) { this.passto = src; }
 
 		@Override
 		public void write(int b) throws IOException {
+			if (passto != null) passto.write(b);
 			//System.out.print(b!=0? 1 : 0);
 			if (nb_of_ones >= 6 && b != 0 && curr_word != null) { // si on a 7 1 de suite, on abandone tout et on recomence
 				curr_word = null;
@@ -135,10 +134,10 @@ public class Playground {
 						//System.out.println("\n"+wrd);
 						try {
 							Trame t = Trame.decode(wrd, CRC.CRC_CCITT);
-							System.out.println("\n<< " + t);
+							System.out.println("<< " + t);
 						} catch (Trame.TrameException e) {
 							e.printStackTrace();
-							System.out.println("\n<< ERREUR");
+							System.out.println("<< ERREUR");
 						}
 						curr_word = null;
 					}
@@ -171,6 +170,27 @@ public class Playground {
 		String smsg = ln.substring(parts[0].length()).trim();
 		Trame t = Trame.i(n, new Word(smsg.getBytes()));
 		return t;
+	}
+
+	static class InOutConnector {
+		InputStream src;
+		OutputStream dest;
+		Thread thread;
+		public InOutConnector(InputStream in, OutputStream out) {
+			this.src = in;
+			this.dest = out;
+			thread = new Thread(() -> {
+				try {
+					do {
+						int b = in.read();
+						if (b < 0) return;
+						out.write(b);
+					} while (true);
+				} catch (IOException e) {e.printStackTrace();}
+			});
+			//thread.isDaemon();
+			thread.start();
+		}
 	}
 
 }

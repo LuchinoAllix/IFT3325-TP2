@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 
 public class TrameSender {
 	public static final Word EMPTY = new Word("11111111");
@@ -47,5 +48,28 @@ public class TrameSender {
 			stream.write(b? 1 : 0);
 			at += 1;
 		}
+	}
+
+	public static Word encodeTrame(Trame trame) {
+		Word t = encodeWithStuffing(trame.encode(CRC.CRC_CCITT));
+		return Word.concat(Trame.FLAG, t, Trame.FLAG, EMPTY);
+	}
+	public static Word encodeWithStuffing(Word wrd) {
+		ArrayList<Boolean> arr = new ArrayList<>();
+		int nb_of_ones = 0;
+		Word.BitIterator iter = wrd.iterator();
+		while (iter.hasNext()) {
+			boolean b = iter.next();
+			arr.add(b);
+			if (b) nb_of_ones += 1;
+			else nb_of_ones = 0;
+			if (nb_of_ones == 5) {
+				arr.add(false);
+				nb_of_ones = 0;
+			}
+		}
+		boolean[] arrb = new boolean[arr.size()];
+		for (int i=0; i< arrb.length; i+=1) arrb[i] = arr.get(i);
+		return new Word(arrb);
 	}
 }

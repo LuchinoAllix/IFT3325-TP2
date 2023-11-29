@@ -176,6 +176,8 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 		private F() {}
 		@Override
 		public Trame.Type getType() { return Trame.Type.F; }
+		@Override
+		public String print_num(){return null;}
 	}
 	/**
 	 * Trame P (pour Ping-Pong)
@@ -184,6 +186,8 @@ public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, T
 		private P() {}
 		@Override
 		public Trame.Type getType() { return Trame.Type.P; }
+		@Override
+		public String print_num(){return null;}
 	}
 	/**
 	 * Énumération des types de trame (parce que java a pas terminé d'implémenter le pattern matching et parfois chiâle)

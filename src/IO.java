@@ -565,7 +565,7 @@ public class IO {
 //		this.chance_bit_errone = chance_bit_errone;
 //		this.skip_erreur = this.chance_bit_errone == 0;
 		this.out_stream = output;
-		this.in_stream = input;
+		this.in_stream = new InputValve(this, input);
 		this.in_thread = new InputThread(this);
 		this.out_thread = new OutputThread(this);
 		this.in_thread.start();
@@ -623,13 +623,13 @@ public class IO {
 		} finally {
 			// ferme le in_stream
 			this.logln("Ferme les stream sortants");
-			try {
-				if (out_stream != null) out_stream.close();
-			} catch (IOException e) {
-				System.err.println(e);
-			} finally {
+			//try {
+			//	if (out_stream != null) out_stream.close();
+			//} catch (IOException e) {
+			//	System.err.println(e);
+			//} finally {
 				out_stream = null;
-			}
+			//}
 			// signale qu'on peut arrêter
 			synchronized (this) {
 				this.notifyAll();
@@ -652,7 +652,9 @@ public class IO {
 			do  {
 				if (this.kill) break;
 				try {
+					System.out.println("Cherche une trame");
 					Optional<Trame> t = TrameReceiver.receiveTrame(this.in_stream);
+					System.out.println("Trouvé: " + t);
 					if (!t.isPresent()) { // stream fermé, on quitte
 						this.status = Status.CLOSED;
 					} else {
@@ -661,8 +663,13 @@ public class IO {
 					}
 				} catch (Trame.TrameException e) {
 					// ignore la trame
+					System.out.println("Trouvé Erroné");
+				} catch (IOException e) {
+					e.printStackTrace();
+					this.status = Status.CLOSED;
+					break;
 				}
-			} while (this.status == Status.CLOSED);
+			} while (this.status != Status.CLOSED);
 		//} catch (IOException e) {
 			// erreur avec le socket, on ferme
 			//this.status = Status.CLOSED;
@@ -670,13 +677,7 @@ public class IO {
 		//} finally {
 			// ferme le in_stream
 			this.logln("Ferme les stream entrant");
-			try {
-				if (in_stream != null) in_stream.close();
-			} catch (IOException e) {
-				System.err.println(e);
-			} finally {
-				out_stream = null;
-			}
+			this.in_stream = null;
 			// signale qu'on peut arrêter
 			synchronized (this) {
 				this.notifyAll();
@@ -691,11 +692,21 @@ public class IO {
 	/** gère la réception des trames de type inconnu
 	 * Ne devrait pas être appelé
 	*/
-	@SuppressWarnings("unused")
+	//@SuppressWarnings("unused")
 	private boolean receive(Trame t) throws Trame.TrameException {
-		// on ignore
-		this.logln("\tignore");
-		return false;
+		// on dispatch à la bonne place
+		return switch (t.getType()) {
+			case A -> receive_a((Trame.A)t);
+			case C -> receive_c((Trame.C)t);
+			case F -> receive_f((Trame.F)t);
+			case I -> receive_i((Trame.I)t);
+			case P -> receive_p((Trame.P)t);
+			case R -> receive_r((Trame.R)t);
+			default -> {
+				logln("Trame inconnu");
+				yield false;
+			}
+		};
 	}
 	/**
 	 * S'occupe de recevoir les ACK et d'avancer la fenêtre d'envoie
@@ -703,8 +714,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException
 	 */
-	@SuppressWarnings("unused")
-	 private boolean receive(Trame.A t) throws Trame.TrameException {
+	//@SuppressWarnings("unused")
+	 private boolean receive_a(Trame.A t) throws Trame.TrameException {
 		if (this.status == Status.NEW || this.status == Status.CLOSED) { // ignore
 			this.logln("\tignore (aucune connexion)");
 			return false; 
@@ -735,8 +746,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException
 	 */
-	@SuppressWarnings("unused")
-	 private boolean receive(Trame.C t) throws Trame.TrameException {
+	//@SuppressWarnings("unused")
+	 private boolean receive_c(Trame.C t) throws Trame.TrameException {
 		// si on est pas en attente de connexion, on ignore
 		if (this.status == Status.NEW) {
 			// on active la connexion et on envoi un P et un RR en confirmation
@@ -759,8 +770,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException
 	 */
-	@SuppressWarnings("unused")
-	 private boolean receive(Trame.F t) throws Trame.TrameException {
+	//@SuppressWarnings("unused")
+	 private boolean receive_f(Trame.F t) throws Trame.TrameException {
 		if (this.status == Status.CONNECTED || this.status == Status.WAITING){
 			close_all();
 			return true;
@@ -774,8 +785,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException si la trame contient une erreur
 	 */
-	@SuppressWarnings("unused")
-	 private boolean receive(Trame.I t) throws Trame.TrameException {
+	//@SuppressWarnings("unused")
+	 private boolean receive_i(Trame.I t) throws Trame.TrameException {
 		if (this.can_receive && this.status == Status.CONNECTED && this.mode != null) { // si on n'a pas encore de connexion, on ignore les trames I
 			// on délègue la logique au mode
 			Trame ret = this.mode.update_in(this, t);
@@ -792,8 +803,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException
 	 */
-	@SuppressWarnings("unused")
-	 private boolean receive(Trame.P t) throws Trame.TrameException {
+	//@SuppressWarnings("unused")
+	 private boolean receive_p(Trame.P t) throws Trame.TrameException {
 		// on fait juste le renvoyer si on est connecté
 		if (this.status == Status.CONNECTED){
 			queue_ctrl(Trame.p());
@@ -811,8 +822,8 @@ public class IO {
 	 * @return
 	 * @throws Trame.TrameException si le mode de rejet demander est invalide
 	 */
-	@SuppressWarnings("unused")
-	private boolean receive(Trame.R t) throws Trame.TrameException {
+	//@SuppressWarnings("unused")
+	private boolean receive_r(Trame.R t) throws Trame.TrameException {
 		if (this.status == Status.CONNECTED) {
 			int n = t.getNum();
 			Mode m = t.selectif()? Mode.SELECT : Mode.GBN;
@@ -836,14 +847,19 @@ public class IO {
 			} catch (InterruptedException e) {}
 		}
 		// abandonne les autres ressources
+		/*
 		synchronized(this.read_lock) {
 			this.read_lock.notifyAll();
 			this.read_buffer = null;
 		}
+		*/
 		synchronized(this.write_lock) {
 			this.write_lock.notifyAll();
 			this.write_buffer = null;
 		}
+		this.in_thread = null;
+		this.out_thread = null;
+
 		return true;
 	}
 	
@@ -1017,6 +1033,7 @@ public class IO {
 					}
 				}
 			}
+			self.read_buffer = null;
 			return -1;
 		}
 		@Override
@@ -1070,7 +1087,7 @@ public class IO {
 		private IO self;
 		private InputThread(IO self) { 
 			this.self = self; 
-			//this.setDaemon(true);
+			this.setDaemon(true);
 		}
 		@Override
 		public void run() {
@@ -1089,7 +1106,7 @@ public class IO {
 		private IO self;
 		private OutputThread(IO self) { 
 			this.self = self; 
-			//this.setDaemon(true);
+			this.setDaemon(true);
 		}
 		@Override
 		public void run() {
@@ -1149,5 +1166,23 @@ public class IO {
 		public NoConnexionException(Throwable src) {super(src);}
 		public NoConnexionException(String msg, Throwable src) {super(msg, src);}
 		public NoConnexionException() {super();}
+	}
+
+	/**
+	 * Permet d'arrêter le flux entrant
+	 */
+	private static class InputValve extends InputStream {
+		private IO self;
+		private InputStream src;
+		InputValve(IO self, InputStream src) {
+			this.self = self;
+			this.src = src;
+		}
+		@Override
+		public int read() throws IOException {
+			if (self.status == Status.CLOSED) return -1;
+			else return src.read();
+		}
+		
 	}
 }

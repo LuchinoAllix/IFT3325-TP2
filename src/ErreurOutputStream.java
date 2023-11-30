@@ -13,7 +13,7 @@ public class ErreurOutputStream extends OutputStream {
 	/**
 	 * probabilité qu'un byte soit choisit aléatoirement. 0 <= chance_erreur <= 1
 	 */
-	private double chance_erreur;
+	private double chance_erreur = 0.001;
 	/**
 	 * Wrap autour de src, en introduisant une probabilité de byte erroné
 	 * @param src OutputStream auquel tout sera délègué
@@ -24,6 +24,9 @@ public class ErreurOutputStream extends OutputStream {
 		if (probErr < 0) probErr = 0;
 		if (probErr > 1) probErr = 1;
 		this.chance_erreur = probErr;
+	}
+	public ErreurOutputStream(OutputStream src) {
+		this.src = src;
 	}
 	@Override
 	public void write(int b) throws IOException {

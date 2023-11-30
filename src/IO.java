@@ -656,9 +656,9 @@ public class IO {
 	private void send_trame(Trame t) throws IOException {
 		if (this.status == Status.CLOSED) return;
 		if (t instanceof Trame.I) {
-			this.logln(">> " + t + " (" + this.write_len + " bytes restant)");
+			this.logln("<< " + t + " (" + this.write_len + " bytes restant)");
 		} else if (t.getType() != Trame.Type.P) {
-			this.logln(">> " + t);
+			this.logln("<< " + t);
 		}
 		TrameSender.sendTrame(this.out_stream, t);
 	}
@@ -681,8 +681,8 @@ public class IO {
 					if (!t.isPresent()) { // stream fermé, on quitte
 						break sendloop;
 					} else {
-						if (t.get().getType() == Trame.Type.I) this.logln("<< " + t.get() + " (" + new String(t.get().getMsg().get().toByteArray()) + ")");
-						else if (t.get().getType() != Trame.Type.P) this.logln("<< " + t.get());
+						if (t.get().getType() == Trame.Type.I) this.logln(">> " + t.get() + " (" + new String(t.get().getMsg().get().toByteArray()) + ")");
+						else if (t.get().getType() != Trame.Type.P) this.logln(">> " + t.get());
 						receive(t.get());
 					}
 				} catch (Trame.TrameException e) {
@@ -756,12 +756,13 @@ public class IO {
 			this.logln("\tactive la connexion");
 		}
 		
-		int n = t.getNum();
+		int n = t.getNum()%8;
 		// on assume qu'on ne recoit pas d'ack pour une trame pas envoyer
 		// 1. avancer la fenêtre
 		// tite optimisation: si on n'a pas a déplacer la fenêtre, on fait juste quitter
 		synchronized (this.out_lock) {
 			avancer_out(n);
+			this.out_buffer[n] = null;
 			this.can_send = t.ready();
 			this.out_lock.notifyAll();
 		}
@@ -1050,12 +1051,27 @@ public class IO {
 		//System.out.println("ABOUMBA");
 		synchronized (this.out_lock) {
 			for (int i=0; i<8; i+=1) {
-				if (this.out_buffer[i] != null) return false;
+				if (this.out_buffer[i] != null) {
+					this.out_lock.notifyAll();
+					return false;
+				}
 			}
+			this.out_lock.notifyAll();
 		}
-		this.out_lock.notifyAll();
 		//System.out.println("OBOUMBO");
 		return true;
+	}
+
+	public String printOutBuffer() {
+		if (this.out_buffer == null) return null;
+		String s = "( ";
+		synchronized (this.out_lock) {
+			for (int i=0; i < 8; i+=1) {
+				if (i != 0) s += "; ";
+				s = s + i + ": " + this.out_buffer[i];
+			}
+		}
+		return s + " )";
 	}
 
 	public boolean canReceive() {return this.can_receive;}

@@ -2,6 +2,11 @@ import java.net.*;
 import java.io.*;
 
 public class Sender{
+	/**
+	 * Classe pour simuler un client qui veut communiquer avec un server (receiver).
+	 * 
+	 * Fait appel à IO pour gérer les trames et utiliser le protocol de go back and.
+	 */
 
 	private static Socket clientSocket;
 	private static InputStream in_stream;
@@ -9,6 +14,16 @@ public class Sender{
 	private static IO io;
 	private static PrintStream writer;
 
+	/**
+	 * Permet d'établir une connection avec le serveur (reveiver) à travers le port fourni. 
+	 * ip est l'adresse de la machine à savoir  "127.0.0.1" si on veut éxécuter localement.
+	 * Le mode permet de choisir si on veut go back and ou selective reject.
+	 * @param ip
+	 * @param port
+	 * @param mode
+	 * @throws UnknownHostException
+	 * @throws IOException
+	 */
 	public static void startConnection(String ip, int port, IO.Mode mode) throws UnknownHostException, IOException {
 		System.out.print("Connexion");
 		int i = 0;
@@ -38,6 +53,10 @@ public class Sender{
 	}
 
 
+	/**
+	 * Ferme la connection et tous les streams utilisés.
+	 * @throws IOException
+	 */
 	public static void stopConnection() throws IOException {
 		io.fermeConnexion();
 		io.getInputStream().close();

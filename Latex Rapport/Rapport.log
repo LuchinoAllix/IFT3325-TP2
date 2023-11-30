@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 22.10) (preloaded format=pdflatex 2022.11.28)  29 NOV 2023 23:06
+This is pdfTeX, Version 3.141592653-2.6-1.40.24 (MiKTeX 22.10) (preloaded format=pdflatex 2022.11.28)  29 NOV 2023 23:21
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -655,17 +655,12 @@ pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has b
                    \relax 
 l.116 \clearpage
                  [1]
-<./Images//dc.png, id=72, 481.8pt x 529.98pt>
+<./Images//dc.png, id=72, 1140.26pt x 1663.21375pt>
 File: ./Images//dc.png Graphic file (type png)
 <use ./Images//dc.png>
 Package pdftex.def Info: ./Images//dc.png  used on input line 120.
-(pdftex.def)             Requested size: 481.79881pt x 529.97868pt.
-
-Overfull \hbox (27.0438pt too wide) in paragraph at lines 120--121
-[][] 
- []
-
-[2
+(pdftex.def)             Requested size: 421.8896pt x 615.37946pt.
+ [2
 
  <./Images//dc.png>]
 LaTeX Font Info:    Trying to load font information for U+msa on input line 159.
@@ -690,7 +685,7 @@ Here is how much of TeX's memory you used:
  1141 hyphenation exceptions out of 8191
  99i,6n,103p,551b,450s stack positions out of 10000i,1000n,20000p,200000b,80000s
  <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecbx1000.pk> <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecbx1200.pk> <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecti1000.pk> <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ectt1000.pk> <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecrm1000.pk> <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecbx1440.pk> <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecrm1728.pk> <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\tcbx1728.pk> <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecbx1728.pk> <C:\Users\luchi\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi600\ecbx2488.pk><C:/Users/luchi/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr10.pfb>
-Output written on Rapport.pdf (6 pages, 174667 bytes).
+Output written on Rapport.pdf (6 pages, 259583 bytes).
 PDF statistics:
  430 PDF objects out of 1000 (max. 8388607)
  41 named destinations out of 1000 (max. 500000)

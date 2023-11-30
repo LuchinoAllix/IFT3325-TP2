@@ -585,6 +585,7 @@ public class IO {
 	*/ 
 	private void send() {
 		try {
+			sendloop:
 			do {
 				if (this.kill) break;
 
@@ -601,16 +602,6 @@ public class IO {
 						this.logln("Peut maintenant recevoir des trames I");
 					}
 
-					//System.out.println("*" + this.out_ctrl_queue.size());
-					// Étape 1: envoyer toutes les trames de controle
-					//int i=0;
-					while (!this.out_ctrl_queue.isEmpty()) {
-						//i += 1;
-						//System.out.println(i);
-						Trame trame = this.out_ctrl_queue.poll();
-						send_trame(trame);
-					}
-
 					// Étape 2: envoyer toutes les trames I
 					if (this.can_send && this.mode != null) {
 						while (this.out_at != (this.out_start + this.mode.taille_fenetre)) {
@@ -625,8 +616,23 @@ public class IO {
 							this.temporisateur.reset(temp_send);
 						}
 					}
+
+					//System.out.println("*" + this.out_ctrl_queue.size());
+					// Étape 1: envoyer toutes les trames de controle
+					//int i=0;
+					while (!this.out_ctrl_queue.isEmpty()) {
+						//i += 1;
+						//System.out.println(i);
+						Trame trame = this.out_ctrl_queue.poll();
+						send_trame(trame);
+						if (trame.getType() == Trame.Type.F) {
+							// fermer le noeud
+							break sendloop;
+						}
+					}
+
 					//System.out.println("yielded");
-					try {this.out_lock.wait();}  catch (InterruptedException e) {}
+					try {this.out_lock.wait(100);}  catch (InterruptedException e) {}
 					//System.out.println("Took back");
 				}
 			} while (this.status != Status.CLOSED);
@@ -640,9 +646,10 @@ public class IO {
 			//} catch (IOException e) {
 			//	System.err.println(e);
 			//} finally {
-				out_stream = null;
+			out_stream = null;
 			//}
 			// signale qu'on peut arrêter
+			this.close_all();
 			synchronized (this) {
 				this.notifyAll();
 			}
@@ -650,13 +657,12 @@ public class IO {
 				this.out_lock.notifyAll();
 				this.out_buffer = null;
 			}
-			this.close_all();
 		}
 	}
 	private void send_trame(Trame t) throws IOException {
 		if (t instanceof Trame.I) {
 			this.logln(">> " + t + " (" + this.write_len + " bytes restant)");
-		} else {
+		} else if (t.getType() != Trame.Type.P) {
 			this.logln(">> " + t);
 		}
 		TrameSender.sendTrame(this.out_stream, t);
@@ -670,6 +676,7 @@ public class IO {
 	 */
 	private void receive() {
 		//try {
+			sendloop:
 			do  {
 				if (this.kill) break;
 				try {
@@ -677,9 +684,10 @@ public class IO {
 					Optional<Trame> t = TrameReceiver.receiveTrame(this.in_stream);
 					//System.out.println("Trouvé: " + t);
 					if (!t.isPresent()) { // stream fermé, on quitte
-						this.status = Status.CLOSED;
+						break sendloop;
 					} else {
-						this.logln("<< " + t.get());
+						if (t.get().getType() == Trame.Type.I) this.logln("<< " + t.get() + " (" + new String(t.get().getMsg().get().toByteArray()) + ")");
+						else if (t.get().getType() != Trame.Type.P) this.logln("<< " + t.get());
 						receive(t.get());
 					}
 				} catch (Trame.TrameException e) {
@@ -687,8 +695,7 @@ public class IO {
 					//System.out.println("Trouvé Erroné");
 				} catch (IOException e) {
 					e.printStackTrace();
-					this.status = Status.CLOSED;
-					break;
+					break sendloop;
 				}
 			} while (this.status != Status.CLOSED);
 		//} catch (IOException e) {
@@ -699,6 +706,7 @@ public class IO {
 			// ferme le in_stream
 			this.logln("Ferme les stream entrant");
 			this.in_stream = null;
+			this.close_all();
 			// signale qu'on peut arrêter
 			synchronized (this) {
 				this.notifyAll();
@@ -707,7 +715,7 @@ public class IO {
 				this.in_lock.notifyAll();
 				this.in_buffer = null;
 			}
-			this.close_all();
+			
 		//}
 	}
 	/** gère la réception des trames de type inconnu
@@ -833,7 +841,7 @@ public class IO {
 			//System.out.println("add to queue");
 			queue_ctrl(Trame.p());
 			if (this.role == Role.SERVER) this.temporisateur.reset(this.temp_p);
-			this.logln("\trenvoi P");
+			//this.logln("\trenvoi P");
 			return true;
 		}
 		// sinon ignore
@@ -872,20 +880,9 @@ public class IO {
 		synchronized (this.in_lock) {
 			this.in_lock.notifyAll();
 		}
-		/*
-		while (this.in_stream != null && this.out_stream != null) { // on attend
-			try {
-				this.wait(10);
-			} catch (InterruptedException e) {}
-		}
-		*/
-		// abandonne les autres ressources
-		/*
-		synchronized(this.read_lock) {
-			this.read_lock.notifyAll();
-			this.read_buffer = null;
-		}
-		*/
+		// arrête le temporsisateur
+		this.temporisateur.stop();
+
 		synchronized(this.write_lock) {
 			this.write_lock.notifyAll();
 			this.write_buffer = null;
@@ -948,18 +945,16 @@ public class IO {
 	 * @param at
 	 */
 	private void avancer_out(int at) {
-		at %= 8;
-		if (this.out_start == at || this.mode == null) return;
-		// on veut 'effacer' les trames du buffer sur lesquels la fenêtre avance
-		// 1.1 trouver le nombre de trame à effacer
-		int nb_a_effacer = this.out_start < at ? at-this.out_start : at-this.out_start;
-		// 1.2 déplacer la fenêtre
-		this.out_start = at;
-		// 1.3 effacer les trames
-		for (int i=1; i<=nb_a_effacer; i+=1) {
-			int n = (this.out_start+this.mode.taille_fenetre-i)%8;
-			if (n < 0) n += 8;
-			this.out_buffer[n] = null;
+		synchronized (this.out_lock){
+			at %= 8;
+			if (this.out_start == at || this.mode == null) return;
+			// on veut 'effacer' les trames qui ne sont pas dans la fenêtre
+			this.out_start = at;
+			for (int i=0; i < 8; i+=1) {
+				if (!in(i, at, (at+this.mode.taille_fenetre)%8)) {
+					this.out_buffer[i] = null;
+				}
+			}
 		}
 	}
 
@@ -988,7 +983,9 @@ public class IO {
 	 * @return
 	 */
 	public boolean fermeConnexion() {
-		close_all();
+		//close_all();
+		queue_ctrl(Trame.end());
+		while (this.status != Status.CLOSED) {try {Thread.sleep(100);} catch (InterruptedException e) {}}
 		return true;
 	}
 	/**
@@ -1011,6 +1008,31 @@ public class IO {
 	 */
 	public boolean estFerme() {
 		return this.status == Status.CLOSED;
+	}
+
+	/**
+	 * 
+	 * @return la quantité de byte qu'il reste à envoyer
+	 */
+	public int data() {
+		synchronized (this.out_lock) {
+			synchronized (this.write_lock) {
+				return this.write_len;
+			}
+		}
+	}
+
+	/**
+	 * Indique si toutes les trames envoyés ont été reçu
+	 * @return
+	 */
+	public boolean allReceived() {
+		synchronized (this.out_lock) {
+			for (int i=0; i<8; i+=1) {
+				if (this.out_buffer[i] != null) return false;
+			}
+		}
+		return true;
 	}
 
 	public boolean canReceive() {return this.can_receive;}
@@ -1067,7 +1089,7 @@ public class IO {
 			if (self.status == Status.NEW || self.status == Status.WAITING) throw new NoConnexionException("Connexion pas encore ouverte");
 			synchronized (self.read_lock) {
 				while (self.status == Status.CONNECTED) {
-					if (self.read_len == 0) try {self.read_lock.wait();} catch (InterruptedException e) {}
+					if (self.read_len == 0) try {self.read_lock.wait(100);} catch (InterruptedException e) {}
 					else {
 						int ret = self.read_buffer[self.read_at];
 						self.read_at += 1;
@@ -1204,6 +1226,7 @@ public class IO {
 		HashMap<Marker, TimerTask> markers = new HashMap<>();
 		private Timer timer = new Timer(true);
 		void reset(Marker marker) {
+			if (this.timer == null) return;
 			TimerTask old = this.markers.get(marker);
 			if (old != null) old.cancel();
 			TimerTask new_task = new MarkerTask(marker);
@@ -1211,8 +1234,13 @@ public class IO {
 			this.markers.put(marker, new_task);
 		}
 		void cancel(Marker marker) {
+			if (this.timer == null) return;
 			TimerTask old = this.markers.remove(marker);
 			if (old != null) old.cancel();
+		}
+		void stop() {
+			this.timer.cancel();
+			this.timer = null;
 		}
 	}
 	/**

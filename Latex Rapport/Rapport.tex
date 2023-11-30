@@ -65,7 +65,7 @@
 	\noindent Auteurs :
 
 	\begin{enumerate}
-		\item[-] Léo Jetzer (?)
+		\item[-] Léo Jetzer (20070432)
 		\item[-] Luchino Allix-Lastrego (20222844)   
 	\end{enumerate}
 
@@ -88,7 +88,38 @@
 \end{titlepage}
 
 \section{Introduction}
+
+Dans le dossier soumis se trouvent : le dossier src qui contient tous les codes pour faire fonctionner l'emetteur et le recepteur, ce rapport, la documentation java et des fichiers tests à transmettre (\verb#lorem\_4096.txt# et Test.txt).
+
+\hfill
+
+Pour les tests la classe \verb#Logger# permet de noter sur l'invite de commande ou dans un fichier (ou les deux) tout ce qu'il se passe, que ce soit du côté \verb#sender# ou \verb#receveur#.
+
+\hfill
+
+Pour exliquer sans trop de détail, Sender et Receiver établissent une connexion entre eux et s'envoient des données à travers des flux qui sont géré par \verb#IO#. Cette classe s'occupe des trames (de la classe \verb#Trames#), et du protocol \emph{Go Back And}. Tous les bytes sont considéré comme des \verb#Word#, pour faciliter leurs opération dessus comme par exemple le calcul de \verb#CRC#.
+
+\hfill
+
+\hfill
+
+Exemple pour lancer les programmes :
+
+\hfill
+
+\verb#receiver 6674#
+
+\hfill
+
+\verb#Sender "127.0.0.1" 6674 "test.txt" 0#
+
+\clearpage
+
 \section{Diagrame de classe}
+
+\includegraphics[scale=1]{dc.png}
+
+\clearpage
 
 \section{Description des classes}
     Voici un résumé des classes importantes. Le javadoc sera également inclus avec le devoir pour plus de détails.

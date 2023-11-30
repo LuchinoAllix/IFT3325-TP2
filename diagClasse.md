@@ -124,9 +124,9 @@ classDiagram
 	IO ..> CRC
 	Trame ..> CRC
 	
-	Emetteur *-- IO
-	Emetteur *-- Socket
-	Recepteur *-- IO
-	Recepteur *-- Socket
+	Receiver *-- IO
+	Receiver *-- Socket
+	Sender *-- IO
+	Sender *-- Socket
 ```
 

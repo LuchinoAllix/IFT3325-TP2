@@ -616,7 +616,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 		else if (so == 0) {
 			int len = end-start;
 			int fb = start/8; // index du premier byte
-			int lb = (end-1)/8; // index du dernier byte
+			//int lb = (end-1)/8; // index du dernier byte
 			int n = nb_byte_for_n_bit(len); // nombre de byte.
 			byte[] arr = new byte[n];
 			// juste copier tout
@@ -1967,6 +1967,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param num
 	 * @return
 	 */
+	@SuppressWarnings("unused")
 	private static int fast_log2(int num) {
 		if( num == 0 ) return 0;
     	return 31 - Integer.numberOfLeadingZeros(num);
@@ -1977,6 +1978,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param n
 	 * @return
 	 */
+	@SuppressWarnings("unused")
 	private static int first_bits_mask(int n) {
 		return 256 - (256>>>n);
 	}
@@ -1985,6 +1987,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param n
 	 * @return
 	 */
+	@SuppressWarnings("unused")
 	private static int last_bits_mask(int n) {
 		return (1<<n) - 1;
 	}

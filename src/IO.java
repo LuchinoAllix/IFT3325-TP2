@@ -381,14 +381,6 @@ public class IO {
 	 */
 	private static final int MAX_I_TRAME_SIZE = 32;
 	/**
-	 * un mot invalide qui va causer une erreur si lu
-	 */
-	private static final Word BIT_INV = new Word("11111111");
-	/**
-	 * Flag de début et fin de trame
-	 */
-	private static final Word FLAG = new Word("01111110");
-	/**
 	 * Délais, en millisecondes, avant que le temporisateur effectue une action
 	 */
 	private static final long DELAIS_TEMPORISATEUR = 20000;
@@ -632,6 +624,7 @@ public class IO {
 					}
 
 					//System.out.println("yielded");
+					TrameSender.sendWithoutStuffing(out_stream, TrameSender.EMPTY); // on envoi 11111111 de temps en tant pour bien séparer les trames
 					try {this.out_lock.wait(100);}  catch (InterruptedException e) {}
 					//System.out.println("Took back");
 				}

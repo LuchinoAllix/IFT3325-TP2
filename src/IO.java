@@ -760,8 +760,11 @@ public class IO {
 		// 1. avancer la fenêtre
 		// tite optimisation: si on n'a pas a déplacer la fenêtre, on fait juste quitter
 		synchronized (this.out_lock) {
-			avancer_out(n);
+			// effacer tout entre out_start et n
+			for (int i=0; i<8; i++) if (in(i, this.out_start, n)) this.out_buffer[i] = null;
 			this.out_buffer[n] = null;
+			avancer_out(n);
+			
 			this.can_send = t.ready();
 			this.out_lock.notifyAll();
 		}

@@ -11,13 +11,17 @@ public class Sender{
 
 	public static void startConnection(String ip, int port, IO.Mode mode) throws UnknownHostException, IOException {
 		System.out.print("Connexion");
+		int i = 0;
 		while (clientSocket == null) {
-			System.out.print("."); System.out.flush();
+			if (i < 3) {
+				System.out.print("."); System.out.flush();
+				i += 1;
+			}
 			try {
 				clientSocket = new Socket(ip, port);
 			} catch (IOException e){
 				clientSocket = null;
-				try { Thread.sleep(100); } catch (InterruptedException i) {}
+				try { Thread.sleep(800); } catch (InterruptedException x) {}
 			}
 		}
 		System.out.println(" Établie!");
@@ -45,7 +49,7 @@ public class Sender{
 		int port = 0;
 		int méthode = 0;
 		String machine = "";
-		if(args.length !=4){System.out.println("Il faut 4 arguments.");System.exit(0);}
+		if(args.length !=4){System.out.println("Il faut 4 arguments. (<machine> <port> <fichier> <mode>)");System.exit(0);}
 
 		try {
 			port = Integer.parseInt(args[1]);
@@ -62,9 +66,12 @@ public class Sender{
 			}
 			//writer.print(input);
 			//writer.flush();
-			while (io.data() > 0 || !io.allReceived()) {
+			//int i = 0;
+			while ((io.data() > 0 || !io.allReceived()) && !io.estFerme()) {
 				Thread.sleep(100);
+				//System.out.println(i);
 			}
+			System.out.println("ici");
 			input.close();
 			stopConnection();
 

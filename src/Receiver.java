@@ -26,7 +26,7 @@ public class Receiver{
 
 	public static void main(String[] args) {
 		int port=0;
-		if(args.length !=1){System.out.println("Il faut 1 argument.");System.exit(0);}
+		if(args.length !=1){System.out.println("Il faut 1 argument. (<port>)");System.exit(0);}
 		try {
 			port = Integer.parseInt(args[0]);
 			start(port);

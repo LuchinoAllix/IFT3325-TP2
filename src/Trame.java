@@ -5,7 +5,7 @@ import java.util.Optional;
  * 
  * Chaque type de trame est un sous-type afin de pouvoir utiliser du pattern matching et de tirer avantage du polymorphisme et de la surcharge de méthode
  */
-public abstract sealed class Trame permits Trame.I, Trame.C, Trame.A, Trame.R, Trame.F, Trame.P {
+public abstract /*sealed*/ class Trame /*permits Trame.I, Trame.C, Trame.A, Trame.R, Trame.F, Trame.P*/ {
 
 	public static final Word FLAG = new Word("01111110");
 

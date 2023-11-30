@@ -596,7 +596,8 @@ public class IO {
 
 					// Étape 2: envoyer toutes les trames I
 					if (this.can_send && this.mode != null) {
-						while (this.out_at != (this.out_start + this.mode.taille_fenetre)) {
+						
+						while (in(this.out_at, this.out_start, (this.out_start + this.mode.taille_fenetre)%8)) {
 							Trame t = this.out_buffer[this.out_at];
 							if (t == null) { // si t == null, alors on peut remplir avec des trames de la queue
 								Optional<Trame> next = mk_prochaine_trame();
@@ -653,6 +654,7 @@ public class IO {
 		}
 	}
 	private void send_trame(Trame t) throws IOException {
+		if (this.status == Status.CLOSED) return;
 		if (t instanceof Trame.I) {
 			this.logln(">> " + t + " (" + this.write_len + " bytes restant)");
 		} else if (t.getType() != Trame.Type.P) {
@@ -738,10 +740,15 @@ public class IO {
 	 */
 	//@SuppressWarnings("unused")
 	 private boolean receive_a(Trame.A t) throws Trame.TrameException {
-		if (this.status == Status.NEW || this.status == Status.CLOSED) { // ignore
+		if (this.status == Status.NEW) { // ignore
 			this.logln("\tignore (aucune connexion)");
 			return false; 
 		} 
+		if (this.status == Status.CLOSED) {
+			this.logln("\tignore (aucune connexion)");
+			close_all();
+			return false;
+		}
 		if (this.status == Status.WAITING) { // confirmation de la connection 
 			this.status = Status.CONNECTED; 
 			this.role = Role.CLIENT; 
@@ -756,9 +763,11 @@ public class IO {
 		synchronized (this.out_lock) {
 			avancer_out(n);
 			this.can_send = t.ready();
+			this.out_lock.notifyAll();
 		}
 		this.temporisateur.cancel(this.temp_send);
-		this.logln("\tprépare à l'envoi");
+		if (!this.can_send) this.logln("\tsuspend à l'envoi");
+		else  this.logln("\tprépare à l'envoi");
 		// indiquer si l'on peut envoyer plus de trame
 		return true;
 	}
@@ -784,6 +793,7 @@ public class IO {
 		} else {
 			// ignore
 			this.logln("\tignore (pas de connexion)");
+			close_all();
 			return false;
 		}
 	}
@@ -800,6 +810,7 @@ public class IO {
 			return true;
 		}
 		this.logln("\tignore (pas de connexion)");
+		close_all();
 		return false; // sinon ignore
 	}
 	/**
@@ -810,7 +821,14 @@ public class IO {
 	 */
 	//@SuppressWarnings("unused")
 	 private boolean receive_i(Trame.I t) throws Trame.TrameException {
-		if (this.can_receive && this.status == Status.CONNECTED && this.mode != null) { // si on n'a pas encore de connexion, on ignore les trames I
+		if (this.status == Status.CONNECTED && this.mode != null) { // si on n'a pas encore de connexion, on ignore les trames I
+			if (!this.can_receive) {
+				this.logln("\tignore (plus de place)");
+				synchronized (this.in_lock) {
+					queue_ctrl(Trame.rnr(this.in_at));
+				}
+				return false; // ignore
+			}
 			// on délègue la logique au mode
 			Trame ret = this.mode.update_in(this, t);
 			// on envoie la trame par la queue de ctrl
@@ -818,6 +836,7 @@ public class IO {
 			return true;
 		} else {
 			this.logln("\tignore (pas de connexion)");
+			close_all();
 			return false;
 		}
 	}
@@ -839,6 +858,7 @@ public class IO {
 		}
 		// sinon ignore
 		this.logln("\tignore (pas de connexion)");
+		close_all();
 		return false;
 	}
 	/**
@@ -857,6 +877,8 @@ public class IO {
 			this.temporisateur.cancel(this.temp_send);
 			return true;
 		}
+		this.logln("\tignore (pas de connexion)");
+		close_all();
 		return false;
 	}
 	
@@ -882,7 +904,8 @@ public class IO {
 		}
 		//this.in_thread = null;
 		//this.out_thread = null;
-
+		//throw new RuntimeException("ABORT!!!");
+		logln("FERMÉ");
 		return true;
 	}
 	
@@ -1008,8 +1031,12 @@ public class IO {
 	 * @return la quantité de byte qu'il reste à envoyer
 	 */
 	public int data() {
+		System.out.println("GIGANTON");
 		synchronized (this.out_lock) {
+			this.out_lock.notifyAll();
 			synchronized (this.write_lock) {
+				this.write_lock.notifyAll();
+				System.out.println("MINIMO");
 				return this.write_len;
 			}
 		}
@@ -1020,11 +1047,14 @@ public class IO {
 	 * @return
 	 */
 	public boolean allReceived() {
+		System.out.println("ABOUMBA");
 		synchronized (this.out_lock) {
 			for (int i=0; i<8; i+=1) {
 				if (this.out_buffer[i] != null) return false;
 			}
 		}
+		this.out_lock.notifyAll();
+		System.out.println("OBOUMBO");
 		return true;
 	}
 
@@ -1220,7 +1250,7 @@ public class IO {
 		private IO self;
 		private OutputThread(IO self) { 
 			this.self = self; 
-			//this.setDaemon(true);
+			this.setDaemon(true);
 		}
 		@Override
 		public void run() {

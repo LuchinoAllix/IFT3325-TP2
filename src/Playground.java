@@ -14,9 +14,17 @@ public class Playground {
 	public static void main(String... args) {
 
 		
-		test_io();
+		//test_io();
 
 		//new InOutConnector(fakeInput, fakeOutput);
+		Trame t = null;
+		try {
+			t = Trame.decode(Trame.rnr(0).encode(CRC.CRC_CCITT), CRC.CRC_CCITT);
+		} catch (Trame.TrameException e) {System.out.println("wtf");}
+		System.out.println(
+			t instanceof Trame.A? ((Trame.A)t).ready() : "WTF!!!"
+		);
+		System.out.println(Trame.rr(0).ready());
 
 	}
 

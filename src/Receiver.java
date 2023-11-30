@@ -2,11 +2,22 @@ import java.net.*;
 import java.io.*;
 
 public class Receiver{
+	/**
+	 * Classe pour simuler un serveur.
+	 * Permet d'établir une connexion pourvu qu'on lui donne un port dipsonible sur la machine.
+	 * Fait appel à IO pour gérer les trames et utiliser le protocol de go back and.
+	 */
 
 	private static ServerSocket serverSocket;
 	private static Socket clientSocket;
 	private static IO io;
 
+	/**
+	 * Permet d'établir une connexion pourvu qu'on lui donne un port disponible sur la machine.
+	 * Crée un IO pour uiliser le protocol go back and.
+	 * @param port
+	 * @throws IOException
+	 */
 	public static void start(int port) throws IOException {
 		serverSocket = new ServerSocket(port);
 		System.out.print("En attente de connexion... "); System.out.flush();
@@ -16,7 +27,10 @@ public class Receiver{
 		Logger log = new Logger();
 		io.setLogger(log);
 	}
-
+	/**
+	 * Permet de fermer les streams de communication et la socket utilisée
+	 * @throws IOException
+	 */
 	public static void stop() throws IOException {
 		io.getInputStream().close();
 		io.getOutputStream().close();
@@ -24,6 +38,10 @@ public class Receiver{
 		serverSocket.close();
 	}
 
+	/**
+	 * Permet de lancer le receiver, il faut fournir les arguments demandé pour le bon fonctionnement, à savoir un port pour établir une connection.
+	 * @param args
+	 */
 	public static void main(String[] args) {
 		int port=0;
 		if(args.length !=1){System.out.println("Il faut 1 argument. (<port>)");System.exit(0);}

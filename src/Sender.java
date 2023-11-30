@@ -70,6 +70,8 @@ public class Sender{
 			while ((io.data() > 0 || !io.allReceived()) && !io.estFerme()) {
 				Thread.sleep(100);
 				//System.out.println(i);
+				//System.out.println("data: " + io.data() + "; tr: " + !io.allReceived() + "; status: " + io.geStatus());
+				//System.out.println(io.printOutBuffer());
 			}
 			//System.out.println("ici");
 			input.close();

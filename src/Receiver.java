@@ -30,8 +30,10 @@ public class Receiver{
 		try {
 			port = Integer.parseInt(args[0]);
 			start(port);
+			byte[] poubelle = new byte[512]; // pour vider le buffer
 			while (!io.estFerme()) {
 				try {Thread.sleep(100);} catch (InterruptedException e) {}
+				if (io.estConnecte()) io.getInputStream().read(poubelle);
 			}
 			stop();
 		} catch (NumberFormatException e) {

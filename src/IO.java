@@ -1095,6 +1095,18 @@ public class IO {
 			return -1;
 		}
 		@Override
+		public int read(byte[] bytes, int off, int len) {
+			if (self.status == Status.NEW || self.status == Status.WAITING) throw new NoConnexionException("Connexion pas encore ouverte");
+			if (self.status == Status.CLOSED) return -1;
+			synchronized (self.read_lock) {
+				int read_len = Math.min(self.read_len, len);
+				System.arraycopy(self.read_buffer, self.read_at, bytes, off, read_len);
+				self.read_at += read_len;
+				self.read_len -= read_len;
+				return read_len;
+			}
+		}
+		@Override
 		public int available() {
 			return self.read_len;
 		}

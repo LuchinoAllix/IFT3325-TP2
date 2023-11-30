@@ -373,7 +373,7 @@ public class IO {
 		public int num() {return numOf(this);}
 	}
 	/**
-	 * le nombre maximal de bytes qu'on met dans le buffer avant d'envoyer un RNR
+	 * le nombre maximal de bytes qu'on met dans le buffer avant d'envoyer un RNR ou de bloquer une écriture
 	 */
 	private static final int MAX_BYTES_IN_BUFFER = 1024;
 	/**
@@ -383,7 +383,7 @@ public class IO {
 	/**
 	 * Délais, en millisecondes, avant que le temporisateur effectue une action
 	 */
-	private static final long DELAIS_TEMPORISATEUR = 20000;
+	private static final long DELAIS_TEMPORISATEUR = 3000;
 	
 	/**
 	 * État de la connexion
@@ -1103,6 +1103,7 @@ public class IO {
 				System.arraycopy(self.read_buffer, self.read_at, bytes, off, read_len);
 				self.read_at += read_len;
 				self.read_len -= read_len;
+				self.read_lock.notifyAll();
 				return read_len;
 			}
 		}
@@ -1127,6 +1128,10 @@ public class IO {
 			if (self.status == Status.NEW || self.status == Status.WAITING) e = new NoConnexionException("Connexion pas encore ouverte");
 			if (self.status == Status.CLOSED) throw new IOException("Connexion fermée");
 			synchronized (self.write_lock) {
+				while (self.write_len > MAX_BYTES_IN_BUFFER) { // on veut bloquer le thread si on a trop de byte à écrire
+					try {self.write_lock.wait(100);} catch (InterruptedException x) {}
+				}
+
 				// réarranger le buffer
 				// si on n'a plus de place, il faut créer un nouveau, sinon on peut le réutiliser
 				byte[] new_buffer = self.write_buffer.length == self.write_len? new byte[Math.max(1, self.write_buffer.length*2)] : self.write_buffer;
@@ -1153,6 +1158,9 @@ public class IO {
 			if (self.status == Status.NEW || self.status == Status.WAITING) e = new NoConnexionException("Connexion pas encore ouverte");
 			if (self.status == Status.CLOSED) throw new IOException("Connexion fermée");
 			synchronized (self.write_lock) {
+				while (self.write_len > MAX_BYTES_IN_BUFFER) { // on veut bloquer le thread si on a trop de byte à écrire
+					try {self.write_lock.wait(100);} catch (InterruptedException x) {}
+				}
 				// réarranger le buffer
 				// si on n'a plus de place, il faut créer un nouveau, sinon on peut le réutiliser
 				//System.out.println("adding " + b.length + " (" + len + ") bytes");

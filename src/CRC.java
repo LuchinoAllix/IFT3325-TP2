@@ -54,7 +54,7 @@ public class CRC {
 
     /**
      * Calcule si <code>msg</code> est valide avec un code de vérification de ce crc
-     * @param gen générateur
+     * @param generator générateur
      * @param msg le mot à vérifier
      * @return true si <code>msg</code> est valide, false s'il contient une erreur
      */

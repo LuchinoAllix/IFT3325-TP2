@@ -22,7 +22,7 @@ public class TrameSender {
 	}
 	/**
 	 * Envoie des bits avec du bit stuffing
-	 * @param bits
+	 * @param wrd
 	 * @throws IOException
 	 */
 	public static void sendWithStuffing(OutputStream stream, Word wrd) throws IOException {
@@ -41,7 +41,7 @@ public class TrameSender {
 	}
 	/**
 	 * envoie des bits sans bit stuffing
-	 * @param bits
+	 * @param wrd
 	 * @throws IOException
 	 */
 	public static void sendWithoutStuffing(OutputStream stream, Word wrd) throws IOException {
@@ -53,10 +53,20 @@ public class TrameSender {
 		}
 	}
 
+	/**
+	 * Encode une trame sans l'envoyer
+	 * @param trame trame à envoyer
+	 * @return une chaîne de bits égal aux bits qui aurait été envoyé par sendTrame(stream, trame)
+	 */
 	public static Word encodeTrame(Trame trame) {
 		Word t = encodeWithStuffing(trame.encode(CRC.CRC_CCITT));
 		return Word.concat(Trame.FLAG, t, Trame.FLAG, EMPTY);
 	}
+	/**
+	 * Encode un mot sans l'envoyer (avec bit stuffing)
+	 * @param wrd mot à encoder
+	 * @return une chaîne de bits égal aux bits qui aurait été envoyé par sendWithStuffing(stream, wrd)
+	 */
 	public static Word encodeWithStuffing(Word wrd) {
 		ArrayList<Boolean> arr = new ArrayList<>();
 		int nb_of_ones = 0;

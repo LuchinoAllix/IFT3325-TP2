@@ -290,7 +290,7 @@ public abstract /*sealed*/ class Trame /*permits Trame.I, Trame.C, Trame.A, Tram
 	 * Créer une trame RR aquittant n
 	 * @param n le numéro de la prochaine trame désiré
 	 * @return RR(n)
-	 * @throws IllegalArgumentException si n est invalide (n < 0 ou n > 7)
+	 * @throws IllegalArgumentException si n est invalide (n &#60; 0 ou n &#62; 7)
 	 */
 	public static Trame.A rr(int n) {
 		if (n < 0 || n > 7) throw new IllegalArgumentException("Numéro de trame invalide");
@@ -300,7 +300,7 @@ public abstract /*sealed*/ class Trame /*permits Trame.I, Trame.C, Trame.A, Tram
 	 * Créer une trame RNR aquittant n
 	 * @param n le numéro de la prochaine trame désiré
 	 * @return RNR(n)
-	 * @throws IllegalArgumentException si n est invalide (n < 0 ou n > 7)
+	 * @throws IllegalArgumentException si n est invalide (n &#60; 0 ou n &#62; 7)
 	 */
 	public static Trame.A rnr(int n) {
 		if (n < 0 || n > 7) throw new IllegalArgumentException("Numéro de trame invalide");
@@ -310,7 +310,7 @@ public abstract /*sealed*/ class Trame /*permits Trame.I, Trame.C, Trame.A, Tram
 	 * Créer une trame REJ rejetant n
 	 * @param n le numéro de la trame rejeté
 	 * @return REJ(n)
-	 * @throws IllegalArgumentException si n est invalide (n < 0 ou n > 7)
+	 * @throws IllegalArgumentException si n est invalide (n &#60; 0 ou n &#62; 7)
 	 */
 	public static Trame.R rej(int n) {
 		if (n < 0 || n > 7) throw new IllegalArgumentException("Numéro de trame invalide");
@@ -320,7 +320,7 @@ public abstract /*sealed*/ class Trame /*permits Trame.I, Trame.C, Trame.A, Tram
 	 * Créer une trame SREJ rejetant n
 	 * @param n le numéro de la trame rejeté
 	 * @return SREJ(n)
-	 * @throws IllegalArgumentException si n est invalide (n < 0 ou n > 7)
+	 * @throws IllegalArgumentException si n est invalide (n &#60; 0 ou n &#62; 7)
 	 */
 	public static Trame.R srej(int n) {
 		if (n < 0 || n > 7) throw new IllegalArgumentException("Numéro de trame invalide");
@@ -352,7 +352,7 @@ public abstract /*sealed*/ class Trame /*permits Trame.I, Trame.C, Trame.A, Tram
 	 * @param n le numéro de la trame
 	 * @param msg les données
 	 * @return la trame d'information
-	 * @throws IllegalArgumentException si n est invalide (n < 0 ou n > 7)
+	 * @throws IllegalArgumentException si n est invalide (n &#60; 0 ou n &#62; 7)
 	 */
 	public static Trame.I i(int n, Word msg) {
 		if (n < 0 || n > 7) throw new IllegalArgumentException("Numéro de trame invalide");

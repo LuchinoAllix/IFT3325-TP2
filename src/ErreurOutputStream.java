@@ -11,13 +11,13 @@ public class ErreurOutputStream extends OutputStream {
 	 */
 	private OutputStream src;
 	/**
-	 * probabilité qu'un byte soit choisit aléatoirement. 0 <= chance_erreur <= 1
+	 * probabilité qu'un byte soit choisit aléatoirement. 0 &#60;= chance_erreur &#60;= 1
 	 */
 	private double chance_erreur = 0.001;
 	/**
 	 * Wrap autour de src, en introduisant une probabilité de byte erroné
 	 * @param src OutputStream auquel tout sera délègué
-	 * @param probErr 0 <= probErr <= 1; probabilité qu'un byte soit choisit aléatoirement lors d'un write()
+	 * @param probErr 0 &#60;= probErr &#60;= 1; probabilité qu'un byte soit choisit aléatoirement lors d'un write()
 	 */
 	public ErreurOutputStream(OutputStream src, double probErr) {
 		this.src = src;
@@ -25,6 +25,10 @@ public class ErreurOutputStream extends OutputStream {
 		if (probErr > 1) probErr = 1;
 		this.chance_erreur = probErr;
 	}
+	/**
+	 * Wrap autour de src, en introduisant une probabilité de byte erroné (0.001 par défaut)
+	 * @param src OutputStream auquel tout sera délègué
+	 */
 	public ErreurOutputStream(OutputStream src) {
 		this.src = src;
 	}

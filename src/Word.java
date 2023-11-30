@@ -130,7 +130,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 			this.array[i] = arr.get(i);
 	}
 	/**
-	 * usage privé principalement. Assume que len <= 8*arr.length
+	 * usage privé principalement. Assume que len &#62;= 8*arr.length
 	 * @param arr
 	 * @param len
 	 */
@@ -233,7 +233,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	}
 	/**
 	 * Retourne le byte commençant à la position pos (0-index).
-	 * Si at < 0, alors -at 0 précéderont les bits pertinent
+	 * Si at &#62; 0, alors -at 0 précéderont les bits pertinent
 	 * @param pos
 	 * @return ByteRequest avec la valeur demandé et le nombre de bits recueuillis
 	 */
@@ -252,7 +252,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	}
 	/**
 	 * Retourne le int commençant à la position pos (0-index).
-	 * Si at < 0, alors -at 0 précéderont les bits pertinent
+	 * Si at &#62; 0, alors -at 0 précéderont les bits pertinent
 	 * @param pos
 	 * @return Request avec la valeur demandé et le nombre de bits recueuillis
 	 */
@@ -288,7 +288,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	}
 	/**
 	 * Retourne le short commençant à la position pos (0-index).
-	 * Si at < 0, alors -at 0 précéderont les bits pertinent
+	 * Si at &#62; 0, alors -at 0 précéderont les bits pertinent
 	 * @param pos
 	 * @return Request avec la valeur demandé et le nombre de bits recueuillis
 	 */
@@ -324,7 +324,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	}
 	/**
 	 * Retourne le long commençant à la position pos (0-index).
-	 * Si at < 0, alors -at 0 précéderont les bits pertinent
+	 * Si at &#62; 0, alors -at 0 précéderont les bits pertinent
 	 * @param pos
 	 * @return Request avec la valeur demandé et le nombre de bits recueuillis
 	 */
@@ -830,7 +830,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param arr tableau de byte
 	 * @param bit_len nombre de bit pertinent dans le tableau
 	 * @param at position du premier bit désiré
-	 * @param n nombre de bit désiré. 0 <= n <= 8
+	 * @param n nombre de bit désiré. 0 &#62;= n &#62;= 8
 	 * @param val nouvelle valeur des bits. place le bit le plus à gauche à la position at
 	 * @param fill valeur à utiliser pour les bits manquants
 	 * @return BitsRequest contenant l'ancienne valeur des bits demandés ainsi que que les informations nécessaires pour identifier les bits pertinents
@@ -883,7 +883,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param arr tableau de byte
 	 * @param bit_len nombre de bit pertinent dans le tableau
 	 * @param at position du premier bit désiré
-	 * @param n nombre de bit désiré. 0 <= n <= 8
+	 * @param n nombre de bit désiré. 0 &#62;= n &#62;= 8
 	 * @param val deuxième argument pour fun
 	 * @param fun fonction sur deux byte
 	 * @param fill valeur à utiliser pour les bits manquants
@@ -937,7 +937,7 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param arr tableau de byte
 	 * @param bit_len nombre de bit pertinent dans le tableau
 	 * @param at position du premier bit désiré
-	 * @param n nombre de bit désiré. 0 <= n <= 8
+	 * @param n nombre de bit désiré. 0 &#62;= n &#62;= 8
 	 * @param fun fonction sur un byte
 	 * @param fill valeur à utiliser pour les bits manquants
 	 * @return ApplyBitsRequest contenant l'ancienne et la nouvelle valeur des bits ainsi que toutes les informations nécessaires pour identifier les bits pertinents
@@ -1193,8 +1193,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param fill valeur a utilisé pour les bits manquants
 	 * @return
 	 */
-	public Word apply(Word other, ByteFunc fun, int aligment, ApplyMode mode, boolean fill) {
-		Word w = apply_to_words(this, other, aligment, mode, fun, fill);
+	public Word apply(Word other, ByteFunc fun, int alignment, ApplyMode mode, boolean fill) {
+		Word w = apply_to_words(this, other, alignment, mode, fun, fill);
 		this.array = w.array; // on vol les données de w
 		this.length = w.length;
 		return this;
@@ -1208,8 +1208,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param fun fonction a appliquer sur les bit (par byte. s'il y a moins de bit que 8, ils seront tous à gauche).
 	 * @return
 	 */
-	public Word apply(Word other, ByteFunc fun, int aligment, ApplyMode mode) {
-		Word w = apply_to_words(this, other, aligment, mode, fun, false);
+	public Word apply(Word other, ByteFunc fun, int alignment, ApplyMode mode) {
+		Word w = apply_to_words(this, other, alignment, mode, fun, false);
 		this.array = w.array; // on vol les données de w
 		this.length = w.length;
 		return this;
@@ -1223,8 +1223,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param fill valeur a utilisé pour les bits manquants
 	 * @return
 	 */
-	public Word apply(Word other, ByteFunc fun, int aligment, boolean fill) {
-		Word w = apply_to_words(this, other, aligment, ApplyMode.INTERSECTION, fun, fill);
+	public Word apply(Word other, ByteFunc fun, int alignment, boolean fill) {
+		Word w = apply_to_words(this, other, alignment, ApplyMode.INTERSECTION, fun, fill);
 		this.array = w.array; // on vol les données de w
 		this.length = w.length;
 		return this;
@@ -1251,8 +1251,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param fun fonction a appliquer sur les bit (par byte. s'il y a moins de bit que 8, ils seront tous à gauche). 
 	 * @return
 	 */
-	public Word apply(Word other, ByteFunc fun, int aligment) {
-		Word w = apply_to_words(this, other, aligment, ApplyMode.INTERSECTION, fun, false);
+	public Word apply(Word other, ByteFunc fun, int alignment) {
+		Word w = apply_to_words(this, other, alignment, ApplyMode.INTERSECTION, fun, false);
 		this.array = w.array; // on vol les données de w
 		this.length = w.length;
 		return this;
@@ -1304,8 +1304,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param fill valeur a utilisé pour les bits manquants
 	 * @return
 	 */
-	public Word xor(Word other, int aligment, ApplyMode mode, boolean fill) {
-		Word w = apply_to_words(this, other, aligment, mode, bit_xor, fill);
+	public Word xor(Word other, int alignment, ApplyMode mode, boolean fill) {
+		Word w = apply_to_words(this, other, alignment, mode, bit_xor, fill);
 		this.array = w.array; // on vol les données de w
 		this.length = w.length;
 		return this;
@@ -1318,8 +1318,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param mode indique quel bits seront utilisé pour calculer la réponse. Si le mode demande d'utiliser un bit qui n'existe pas dans un des mot, la valeur de fill sera utilisé pour ce bit
 	 * @return
 	 */
-	public Word xor(Word other, int aligment, ApplyMode mode) {
-		Word w = apply_to_words(this, other, aligment, mode, bit_xor, false);
+	public Word xor(Word other, int alignment, ApplyMode mode) {
+		Word w = apply_to_words(this, other, alignment, mode, bit_xor, false);
 		this.array = w.array; // on vol les données de w
 		this.length = w.length;
 		return this;
@@ -1332,8 +1332,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * @param fill valeur a utilisé pour les bits manquants
 	 * @return
 	 */
-	public Word xor(Word other, int aligment, boolean fill) {
-		Word w = apply_to_words(this, other, aligment, ApplyMode.INTERSECTION, bit_xor, fill);
+	public Word xor(Word other, int alignment, boolean fill) {
+		Word w = apply_to_words(this, other, alignment, ApplyMode.INTERSECTION, bit_xor, fill);
 		this.array = w.array; // on vol les données de w
 		this.length = w.length;
 		return this;
@@ -1358,8 +1358,8 @@ public class Word implements Comparable<Word>, Iterable<Boolean> {
 	 * 0 indique que les bits de gauche sont alignés, autrement décale le deuxième mot de x bits vers la droite (vers la gauche si négatif)
 	 * @return
 	 */
-	public Word xor(Word other, int aligment) {
-		Word w = apply_to_words(this, other, aligment, ApplyMode.INTERSECTION, bit_xor, false);
+	public Word xor(Word other, int alignment) {
+		Word w = apply_to_words(this, other, alignment, ApplyMode.INTERSECTION, bit_xor, false);
 		this.array = w.array; // on vol les données de w
 		this.length = w.length;
 		return this;

@@ -61,7 +61,6 @@ public class TrameReceiver {
 	/**
 	 * Lit le prochain bit à l'entrée
 	 * @return
-	 * @throws IOException
 	 */
 	private static Optional<Boolean> readNextBit(InputStream stream) {
 		try {

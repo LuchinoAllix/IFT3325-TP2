@@ -1,1 +1,1 @@
-javadoc -encoding "utf-8" -private -d .\javadocs .\src\* --enable-preview -source 16
+javadoc -encoding "utf-8" -private -d .\javadocs .\src\* --enable-preview -source 20

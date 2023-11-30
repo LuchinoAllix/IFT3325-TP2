@@ -1031,12 +1031,12 @@ public class IO {
 	 * @return la quantité de byte qu'il reste à envoyer
 	 */
 	public int data() {
-		System.out.println("GIGANTON");
+		//System.out.println("GIGANTON");
 		synchronized (this.out_lock) {
 			this.out_lock.notifyAll();
 			synchronized (this.write_lock) {
 				this.write_lock.notifyAll();
-				System.out.println("MINIMO");
+				//System.out.println("MINIMO");
 				return this.write_len;
 			}
 		}
@@ -1047,14 +1047,14 @@ public class IO {
 	 * @return
 	 */
 	public boolean allReceived() {
-		System.out.println("ABOUMBA");
+		//System.out.println("ABOUMBA");
 		synchronized (this.out_lock) {
 			for (int i=0; i<8; i+=1) {
 				if (this.out_buffer[i] != null) return false;
 			}
 		}
 		this.out_lock.notifyAll();
-		System.out.println("OBOUMBO");
+		//System.out.println("OBOUMBO");
 		return true;
 	}
 
@@ -1196,6 +1196,9 @@ public class IO {
 			synchronized (self.write_lock) {
 				while (self.write_len > MAX_BYTES_IN_BUFFER) { // on veut bloquer le thread si on a trop de byte à écrire
 					try {self.write_lock.wait(100);} catch (InterruptedException x) {}
+					if (self.status == Status.CLOSED) {
+						throw new IOException("Connexion fermée");
+					}
 				}
 				// réarranger le buffer
 				// si on n'a plus de place, il faut créer un nouveau, sinon on peut le réutiliser

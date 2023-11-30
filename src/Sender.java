@@ -60,7 +60,7 @@ public class Sender{
 			
 			startConnection(machine,port,mode);
 			String ln;
-			while ((ln = input.readLine()) != null) {
+			while ((ln = input.readLine()) != null && !io.estFerme()) {
 				//System.out.println(ln);
 				writer.println(ln);
 			}
@@ -71,7 +71,7 @@ public class Sender{
 				Thread.sleep(100);
 				//System.out.println(i);
 			}
-			System.out.println("ici");
+			//System.out.println("ici");
 			input.close();
 			stopConnection();
 

@@ -375,11 +375,11 @@ public class IO {
 	/**
 	 * le nombre maximal de bytes qu'on met dans le buffer avant d'envoyer un RNR
 	 */
-	private static final int MAX_BYTES_IN_BUFFER = 4096;
+	private static final int MAX_BYTES_IN_BUFFER = 1024;
 	/**
 	 * Nombre maximal de byte que l'on envoi en msg dans une trame
 	 */
-	private static final int MAX_I_TRAME_SIZE = 1024;
+	private static final int MAX_I_TRAME_SIZE = 32;
 	/**
 	 * un mot invalide qui va causer une erreur si lu
 	 */

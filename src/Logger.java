@@ -2,6 +2,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 
+/**
+ * Permet de logger des choses à la fois sur la console et dans un autre stream
+ */
 public class Logger {
 	private PrintStream file_writer;
 	private PrintStream console;

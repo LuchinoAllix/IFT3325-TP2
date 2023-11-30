@@ -1081,7 +1081,7 @@ public class IO {
 		public int read() throws IOException {
 			if (self.status == Status.NEW || self.status == Status.WAITING) throw new NoConnexionException("Connexion pas encore ouverte");
 			synchronized (self.read_lock) {
-				while (self.status == Status.CONNECTED) {
+				while (self.status == Status.CONNECTED && self.read_buffer != null) {
 					if (self.read_len == 0) try {self.read_lock.wait(100);} catch (InterruptedException e) {}
 					else {
 						int ret = self.read_buffer[self.read_at];
@@ -1097,15 +1097,21 @@ public class IO {
 		@Override
 		public int read(byte[] bytes, int off, int len) {
 			if (self.status == Status.NEW || self.status == Status.WAITING) throw new NoConnexionException("Connexion pas encore ouverte");
-			if (self.status == Status.CLOSED) return -1;
+			
 			synchronized (self.read_lock) {
-				int read_len = Math.min(self.read_len, len);
-				System.arraycopy(self.read_buffer, self.read_at, bytes, off, read_len);
-				self.read_at += read_len;
-				self.read_len -= read_len;
-				self.read_lock.notifyAll();
-				return read_len;
+				while (self.status == Status.CONNECTED && self.read_buffer != null) {
+					if (self.read_len == 0) try {self.read_lock.wait(100);} catch (InterruptedException e) {}
+
+					int read_len = Math.min(self.read_len, len);
+					System.arraycopy(self.read_buffer, self.read_at, bytes, off, read_len);
+					self.read_at += read_len;
+					self.read_len -= read_len;
+					self.read_lock.notifyAll();
+					return read_len;
+				}
 			}
+			self.read_buffer = null;
+			return -1;
 		}
 		@Override
 		public int available() {

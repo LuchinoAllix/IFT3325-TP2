@@ -23,7 +23,7 @@ public class Receiver{
 		System.out.print("En attente de connexion... "); System.out.flush();
 		clientSocket = serverSocket.accept();
 		System.out.println("Établie!");
-		io = new IO(clientSocket.getInputStream(),clientSocket.getOutputStream());
+		io = new IO(clientSocket.getInputStream(),new ErreurOutputStream(clientSocket.getOutputStream()));
 		Logger log = new Logger();
 		io.setLogger(log);
 	}

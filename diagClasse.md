@@ -100,11 +100,15 @@ classDiagram
 	class File {
 		<<extern>>
 	}
-	class Emetteur {
-		+send(msg: String)
+	class Sender {
+		+startConnection(ip: String, port: int, mode: Mode)$
+		+stopConnection()$
+		+main(args: String[])$
 	}
-	class Recepteur {
-		+receive() String
+	class Receiver {
+		+start(port: int)$
+		+stop()$
+		+main(args: String[])$
 	}
 	
 	IO *-- Status

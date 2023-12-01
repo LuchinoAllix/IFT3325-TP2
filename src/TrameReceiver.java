@@ -42,6 +42,7 @@ public class TrameReceiver {
 				curr_word.add(b); // ajoute le bit à la liste
 			} else {
 				if (nb_of_ones == 6) { // fin de la trame
+					if (curr_word.size() < 7) throw new Trame.TrameException("Trame trop courte");
 					boolean[] bits = new boolean[curr_word.size()-7];
 					for (int i=0; i<bits.length; i+=1)
 						bits[i] = curr_word.get(i);

@@ -42,7 +42,7 @@ public class Sender{
 		System.out.println(" Établie!");
 		
 		in_stream = clientSocket.getInputStream();
-		out_stream = new ErreurOutputStream(clientSocket.getOutputStream());
+		out_stream = new ErreurOutputStream(clientSocket.getOutputStream(), 0);
 		io = new IO(in_stream,out_stream);
 
 		Logger log = new Logger();

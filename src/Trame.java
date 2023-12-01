@@ -55,6 +55,14 @@ public abstract /*sealed*/ class Trame /*permits Trame.I, Trame.C, Trame.A, Tram
 		if (msg != null) s += "|" + msg;
 		return s + "]";
 	}
+	public String toStringShort() {
+		String s = "[" + print_type();
+		String num = print_num();
+		//String msg = print_msg();
+		if (num != null) s += "|" + num;
+		//if (msg != null) s += "|" + msg;
+		return s + "]";
+	}
 
 	/**
 	 * Trame d'information. C'est la seule trame qui contient un message

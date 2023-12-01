@@ -576,7 +576,8 @@ public class IO {
 	*/ 
 	private void send() {
 		try {
-			sendloop:
+			boolean sent = false;
+			//sendloop:
 			do {
 				if (this.kill) break;
 
@@ -593,20 +594,20 @@ public class IO {
 						this.logln("Peut maintenant recevoir des trames I");
 					}
 
-					// Étape 2: envoyer toutes les trames I
-					if (this.can_send && this.mode != null) {
-						
-						while (in(this.out_at, this.out_start, (this.out_start + this.mode.taille_fenetre)%8)) {
-							Trame t = this.out_buffer[this.out_at];
-							if (t == null) { // si t == null, alors on peut remplir avec des trames de la queue
-								Optional<Trame> next = mk_prochaine_trame();
-								t = this.out_buffer[this.out_at] = next.orElse(null);
-								if (t == null) break; // si t est encore null, on a plus rien a envoyer alors on quitte la boucle
-							}
+					// Étape 2: envoyer une trame I
+					if (this.can_send && this.mode != null && in(this.out_at, this.out_start, (this.out_start + this.mode.taille_fenetre)%8)) {
+						// 2.1 si on n'a pas de trame a envoyer, essayer d'en fabriquer une
+						Trame t = this.out_buffer[this.out_at];
+						if (t == null) { // si t == null, alors on peut remplir avec des trames de la queue
+							Optional<Trame> next = mk_prochaine_trame();
+							t = this.out_buffer[this.out_at] = next.orElse(null);
+						}
+						if (t != null) {
 							send_trame(t);
 							this.out_at = (this.out_at+1)%8;
 							this.temporisateur.reset(temp_send);
-						}
+							sent = true;
+						} else {} // si t est encore null, on a plus rien a envoyer alors on skip
 					}
 
 					//System.out.println("*" + this.out_ctrl_queue.size());
@@ -619,7 +620,7 @@ public class IO {
 						send_trame(trame);
 						if (trame.getType() == Trame.Type.F) {
 							// fermer le noeud
-							break sendloop;
+							close_all();
 						}
 					}
 
@@ -628,6 +629,7 @@ public class IO {
 					try {this.out_lock.wait(100);}  catch (InterruptedException e) {}
 					//System.out.println("Took back");
 				}
+				//if (sent) try {Thread.sleep(300);}  catch (InterruptedException e) {}
 			} while (this.status != Status.CLOSED);
 		} catch (IOException e) {
 			System.err.println(e);
@@ -656,6 +658,8 @@ public class IO {
 		if (this.status == Status.CLOSED) return;
 		if (t instanceof Trame.I) {
 			this.logln("<< " + t + " (" + this.write_len + " bytes restant)");
+			this.logln("data: " + this.data() + "; tr: " + !this.allReceived() + "; status: " + this.geStatus());
+			this.logln(this.printOutBuffer());
 		} else if (t.getType() != Trame.Type.P) {
 			this.logln("<< " + t);
 		}
@@ -762,8 +766,10 @@ public class IO {
 		synchronized (this.out_lock) {
 			// effacer tout entre out_start et n
 			for (int i=0; i<8; i++) if (in(i, this.out_start, n)) this.out_buffer[i] = null;
-			this.out_buffer[n] = null;
 			avancer_out(n);
+			this.out_buffer[n] = null;
+			this.logln("data: " + this.data() + "; tr: " + !this.allReceived() + "; status: " + this.geStatus());
+			this.logln(this.printOutBuffer());
 			
 			this.can_send = t.ready();
 			this.out_lock.notifyAll();
@@ -796,7 +802,7 @@ public class IO {
 		} else {
 			// ignore
 			this.logln("\tignore (pas de connexion)");
-			close_all();
+			//close_all();
 			return false;
 		}
 	}
@@ -836,6 +842,10 @@ public class IO {
 			Trame ret = this.mode.update_in(this, t);
 			// on envoie la trame par la queue de ctrl
 			if (ret != null) queue_ctrl(ret);
+
+			//this.logln("data: " + this.data() + "; tr: " + !this.allReceived() + "; status: " + this.geStatus());
+			//this.logln(this.printOutBuffer());
+
 			return true;
 		} else {
 			this.logln("\tignore (pas de connexion)");
@@ -876,8 +886,13 @@ public class IO {
 			int n = t.getNum();
 			Mode m = t.selectif()? Mode.SELECT : Mode.GBN;
 			if (this.mode == null || !this.mode.supporte(m)) throw new Trame.TrameException("Mode de rejet invalide");
-			m.update_out(n, this);
+			synchronized (this.out_lock) {
+				m.update_out(n, this);
+				this.out_lock.notifyAll();
+			}
 			this.temporisateur.cancel(this.temp_send);
+			this.logln("data: " + this.data() + "; tr: " + !this.allReceived() + "; status: " + this.geStatus());
+			this.logln(this.printOutBuffer());
 			return true;
 		}
 		this.logln("\tignore (pas de connexion)");
@@ -968,9 +983,11 @@ public class IO {
 			at %= 8;
 			if (this.out_start == at || this.mode == null) return;
 			// on veut 'effacer' les trames qui ne sont pas dans la fenêtre
+			// on veut aussi effacer les trames [out_start, at[
+			int start = this.out_start;
 			this.out_start = at;
 			for (int i=0; i < 8; i+=1) {
-				if (!in(i, at, (at+this.mode.taille_fenetre)%8)) {
+				if (!in(i, at, (at+this.mode.taille_fenetre)%8) || in(i, start, at)) {
 					this.out_buffer[i] = null;
 				}
 			}
@@ -1066,11 +1083,18 @@ public class IO {
 
 	public String printOutBuffer() {
 		if (this.out_buffer == null) return null;
+		String RESET = "\u001B[0m";
+        String RED = "\u001B[31m";
+        String GREEN = "\u001B[32m";
 		String s = "( ";
 		synchronized (this.out_lock) {
 			for (int i=0; i < 8; i+=1) {
 				if (i != 0) s += "; ";
-				s = s + i + ": " + this.out_buffer[i];
+				if (this.mode != null && in(i, this.out_start, this.out_start+this.mode.taille_fenetre)){
+					s = s + (i==this.out_at? GREEN : RED) + i + ": " + Optional.ofNullable(this.out_buffer[i]).map(t -> t.toStringShort()).orElse("[]") + RESET;
+				} else {
+					s = s + i + ": " + Optional.ofNullable(this.out_buffer[i]).map(t -> t.toStringShort()).orElse("[]");
+				}
 			}
 		}
 		return s + " )";

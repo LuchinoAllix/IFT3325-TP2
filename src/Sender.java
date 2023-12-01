@@ -13,6 +13,8 @@ public class Sender{
 	private static OutputStream out_stream;
 	private static IO io;
 	private static PrintStream writer;
+	private static int slowdown = 0;
+	private static int error = 0;
 
 	/**
 	 * Permet d'établir une connection avec le serveur (reveiver) à travers le port fourni. 
@@ -42,8 +44,11 @@ public class Sender{
 		System.out.println(" Établie!");
 		
 		in_stream = clientSocket.getInputStream();
-		out_stream = new ErreurOutputStream(clientSocket.getOutputStream(), 0);
+		out_stream = new ErreurOutputStream(clientSocket.getOutputStream(), error > 0? (1.0/error) : 0);
 		io = new IO(in_stream,out_stream);
+		if (slowdown > 0) {
+			io.slowdown(slowdown);		
+		}
 
 		Logger log = new Logger();
 		io.setLogger(log);
@@ -68,7 +73,79 @@ public class Sender{
 		int port = 0;
 		int méthode = 0;
 		String machine = "";
-		if(args.length !=4){System.out.println("Il faut 4 arguments. (<machine> <port> <fichier> <mode>)");System.exit(0);}
+		if(args.length < 4) {
+			System.out.println("Il faut 4 arguments. (<machine> <port> <fichier> <mode>)");
+			System.exit(0);
+		}
+		if (args.length > 4) { // on a des options
+			String[] nargs = new String[4];
+			int i = 0;
+			int a = 0;
+			boolean s = false;
+			boolean err = false;
+			while (i < args.length) {
+				String arg = args[i];
+				//System.out.println(arg);
+				if (arg.equals("-s")) {
+					if (s) {
+						System.err.println("Il ne peut y avoir l'option -S et -s en même temps");
+						System.exit(0);
+					}
+					try {
+						slowdown = Integer.parseInt(args[i+1]);
+					} catch (IndexOutOfBoundsException e) {
+						System.err.println("L'option -s doit être suivit d'un entier");
+						System.exit(0);
+					} catch (NumberFormatException e) {
+						System.err.println("L'option -s doit être suivit d'un entier");
+						System.exit(0);
+					}
+					s = true;
+					i += 2;
+				} else if (arg.equals("-S")) {
+					if (s) {
+						System.err.println("Il ne peut y avoir l'option -S et -s en même temps");
+						System.exit(0);
+					}
+					slowdown = 300;
+					i += 1;
+					s = true;
+				} else if (arg.equals("-e")) {
+					if (err) {
+						System.err.println("Il ne peut y avoir l'option -E et -e en même temps");
+						System.exit(0);
+					}
+					try {
+						error = Integer.parseInt(args[i+1]);
+					} catch (IndexOutOfBoundsException e) {
+						System.err.println("L'option -e doit être suivit d'un entier");
+						System.exit(0);
+					} catch (NumberFormatException e) {
+						System.err.println("L'option -e doit être suivit d'un entier");
+						System.exit(0);
+					}
+					err = true;
+					i += 2;
+				} else if (arg.equals("-E")) {
+					if (s) {
+						System.err.println("Il ne peut y avoir l'option -E et -e en même temps");
+						System.exit(0);
+					}
+					error = 1000;
+					i += 1;
+					err = true;
+				} else {
+					if (a >= 4) {
+						System.out.println("Il faut 4 arguments. (<machine> <port> <fichier> <mode>)");
+						System.exit(0);
+					}
+					nargs[a] = arg;
+					a += 1;
+					i += 1;
+				}
+			}
+			args = nargs;
+		}
 
 		try {
 			port = Integer.parseInt(args[1]);

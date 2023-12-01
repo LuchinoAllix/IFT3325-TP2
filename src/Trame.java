@@ -260,11 +260,28 @@ public abstract /*sealed*/ class Trame /*permits Trame.I, Trame.C, Trame.A, Tram
 			Word msg = bits.subWord(16, crc_start);
 			return switch (type) {
 				case I -> new I(num, msg);
-				case C -> new C(num);
-				case A -> new A(num);
-				case R -> new R(num);
-				case F -> new F();
-				case P -> new P();
+				case C -> {
+					if (msg.length > 0) throw new TrameException("Les Trames C ne contiennent pas de message");
+					yield new C(num);
+				}
+				case A -> {
+					if (msg.length > 0) throw new TrameException("Les Trames A ne contiennent pas de message");
+					yield new A(num);
+				}
+				case R -> {
+					if (msg.length > 0) throw new TrameException("Les Trames R ne contiennent pas de message");
+					yield new R(num);
+				}
+				case F -> {
+					if (msg.length > 0) throw new TrameException("Les Trames F ne contiennent pas de message");
+					if (num != 0) throw new TrameException("Le numéro d'une trame F doit être 0");
+					yield new F();
+				}
+				case P -> {
+					if (msg.length > 0) throw new TrameException("Les Trames P ne contiennent pas de message");
+					if (num != 0) throw new TrameException("Le numéro d'une trame P doit être 0");
+					yield new P();
+				}
 			};
 		} catch (IllegalArgumentException e) {throw new TrameException(e);}
 	}

@@ -219,7 +219,7 @@ public class IO {
 						self.temporisateur.reset(self.temp_ack);
 						synchronized (self.in_lock) { self.can_receive = true; }
 						self.logln("\tpas la trame attendu");
-						self.logln("\tenvoi rej("+n+")");
+						self.logln("\tenvoi rej("+self.in_at+")");
 						return Trame.rej(self.in_at);
 					}
 				} else {
@@ -408,6 +408,7 @@ public class IO {
 	 * pour si on veut des traces. permet d'imprimer de manière personnalisé
 	 */
 	private Logger logger = null; 
+	private int slowdown_value = -1;
 	
 	/**
 	 * un objet quelqu'onque pour verouiller le buffer de lecture
@@ -629,7 +630,7 @@ public class IO {
 					try {this.out_lock.wait(100);}  catch (InterruptedException e) {}
 					//System.out.println("Took back");
 				}
-				//if (sent) try {Thread.sleep(300);}  catch (InterruptedException e) {}
+				if (this.slowdown_value > 0 && sent) try {Thread.sleep(this.slowdown_value);}  catch (InterruptedException e) {}
 			} while (this.status != Status.CLOSED);
 		} catch (IOException e) {
 			System.err.println(e);
@@ -1103,6 +1104,10 @@ public class IO {
 	public boolean canReceive() {return this.can_receive;}
 	public boolean canSend() {return this.can_send;}
 	public Optional<Mode> getMode() { return Optional.ofNullable(this.mode); }
+
+	public void slowdown(int v) {
+		this.slowdown_value = v;
+	}
 
 	/**
 	 * Retourne un InputStream bloquant permettant de lire les bytes reçu par ce IO
